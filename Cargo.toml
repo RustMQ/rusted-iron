@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
 
 [dependencies]
+rocket = "0.3.6"
+rocket_codegen = "0.3.6"
