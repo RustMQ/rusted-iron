@@ -1,6 +1,8 @@
 [package]
 name = "rusted-iron"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
 
 [dependencies]
+rocket = "0.3.6"
+rocket_codegen = "0.3.6"
