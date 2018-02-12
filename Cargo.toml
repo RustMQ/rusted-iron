@@ -6,3 +6,6 @@ authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
 [dependencies]
 rocket = "0.3.6"
 rocket_codegen = "0.3.6"
+redis = "0.8.0"
+r2d2 = "0.8.2"
+r2d2_redis = "0.7.0"
