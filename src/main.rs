@@ -1,18 +1,28 @@
-#![feature(plugin)]
+#![feature(plugin, decl_macro)]
 #![plugin(rocket_codegen)]
 
 extern crate rocket;
 extern crate redis;
 extern crate r2d2;
 extern crate r2d2_redis;
+extern crate serde;
+extern crate serde_json;
+
+#[macro_use]
+extern crate rocket_contrib;
+#[macro_use]
+extern crate serde_derive;
 
 mod db;
 
-use std::io::Cursor;
-use r2d2_redis::RedisConnectionManager;
-use rocket::*;
-use rocket::http::*;
-use rocket::response::*;
+use rocket::{Rocket};
+use rocket_contrib::{Json};
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+struct RedisInfo {
+    version: String
+}
 
 #[get("/")]
 fn index() -> String {
@@ -20,11 +30,21 @@ fn index() -> String {
 }
 
 #[get("/version")]
-fn redis_version(conn: db::Conn) -> String {
+fn redis_version(conn: db::Conn) -> Json {
     let info : redis::InfoDict = redis::cmd("INFO").query(&*conn).unwrap();
-    let version : Option<String> = info.get("redis_version");
+    let redis_info = RedisInfo {
+        version: info.get("redis_version").unwrap()
+    };
 
-    format!("Redis version: {} ", version.unwrap())
+    Json(json!(redis_info))
+}
+
+#[error(404)]
+fn not_found() -> Json {
+    Json(json!({
+        "status": "error",
+        "reason": "Resource was not found."
+    }))
 }
 
 fn rocket() -> (Rocket, Option<db::Conn>) {
@@ -34,7 +54,8 @@ fn rocket() -> (Rocket, Option<db::Conn>) {
     let rocket = rocket::ignite()
         .manage(pool)
         .mount("/", routes![index])
-        .mount("/redis/", routes![redis_version]);
+        .mount("/redis/", routes![redis_version])
+        .catch(errors![not_found]);
 
     (rocket, conn)
 }

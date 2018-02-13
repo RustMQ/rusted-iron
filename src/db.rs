@@ -13,6 +13,7 @@ pub type Pool = r2d2::Pool<RedisConnectionManager>;
 pub const DATABASE_URL: &'static str = env!("REDISCLOUD_URL");
 
 pub fn init_pool() -> Pool {
+    println!("REDISCLOUD_URL: {}", DATABASE_URL);
     let manager = RedisConnectionManager::new(DATABASE_URL).unwrap();
     r2d2::Pool::builder()
         .build(manager).expect("db pool")
