@@ -10,13 +10,12 @@ use rocket::{Request, State, Outcome};
 
 pub type Pool = r2d2::Pool<RedisConnectionManager>;
 
-pub const DATABASE_URL: &'static str = env!("REDISCLOUD_URL");
+pub const DATABASE_URL: Option<&'static str> = option_env!("REDISCLOUD_URL");
 
 pub fn init_pool() -> Pool {
-    println!("REDISCLOUD_URL: {}", DATABASE_URL);
-    let manager = RedisConnectionManager::new(DATABASE_URL).unwrap();
-    r2d2::Pool::builder()
-        .build(manager).expect("db pool")
+    println!("REDISCLOUD_URL: {:?}", DATABASE_URL);
+    let manager: RedisConnectionManager = RedisConnectionManager::new(DATABASE_URL.expect("env is not path")).expect("manager created");
+    r2d2::Pool::builder().build(manager).expect("db pool")
 }
 
 pub struct Conn(pub r2d2::PooledConnection<RedisConnectionManager>);

@@ -49,6 +49,7 @@ fn not_found() -> Json {
 
 fn rocket() -> (Rocket, Option<db::Conn>) {
     let pool = db::init_pool();
+    println!("{:?}", pool);
     let conn = Some(db::Conn(pool.get().expect("database connection")));
 
     let rocket = rocket::ignite()
