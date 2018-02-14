@@ -16,13 +16,9 @@ extern crate serde_derive;
 mod db;
 
 use rocket::{Rocket};
+use rocket::http::{RawStr};
 use rocket_contrib::{Json};
-use serde::{Serialize, Deserialize};
-
-#[derive(Serialize, Deserialize)]
-struct RedisInfo {
-    version: String
-}
+use redis::RedisError;
 
 #[get("/")]
 fn index() -> String {
@@ -32,11 +28,31 @@ fn index() -> String {
 #[get("/version")]
 fn redis_version(conn: db::Conn) -> Json {
     let info : redis::InfoDict = redis::cmd("INFO").query(&*conn).unwrap();
-    let redis_info = RedisInfo {
-        version: info.get("redis_version").unwrap()
-    };
+    let redis_version: String = info.get("redis_version").unwrap();
 
-    Json(json!(redis_info))
+    Json(json!({
+        "redis_version": redis_version
+    }))
+}
+
+#[get("/message/<key>")]
+fn redis_get_key(key: &RawStr, conn: db::Conn) -> Json {
+    let key_as_str = key.as_str();
+    let result: Result<String, RedisError> = redis::Cmd::new().arg("GET").arg(key_as_str).query(&*conn);
+    match result {
+        Ok(v) => {
+            return Json(json!({
+                "key": key_as_str.to_string(),
+                "value": String::from(v)
+            }))
+        },
+        Err(e) => {
+            return Json(json!({
+                "status": "error",
+                "reason": format!("Internal Server Error: {}", e)
+            }))
+        },
+    }
 }
 
 #[error(404)]
@@ -55,7 +71,7 @@ fn rocket() -> (Rocket, Option<db::Conn>) {
     let rocket = rocket::ignite()
         .manage(pool)
         .mount("/", routes![index])
-        .mount("/redis/", routes![redis_version])
+        .mount("/redis/", routes![redis_version, redis_get_key])
         .catch(errors![not_found]);
 
     (rocket, conn)
