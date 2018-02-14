@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use std::env;
 
 use r2d2;
 use redis::Connection;
@@ -10,12 +11,13 @@ use rocket::{Request, State, Outcome};
 
 pub type Pool = r2d2::Pool<RedisConnectionManager>;
 
-pub const DATABASE_URL: Option<&'static str> = option_env!("REDISCLOUD_URL");
-
 pub fn init_pool() -> Pool {
-    println!("REDISCLOUD_URL: {:?}", DATABASE_URL);
-    let manager: RedisConnectionManager = RedisConnectionManager::new(DATABASE_URL.expect("env is not path")).expect("manager created");
-    r2d2::Pool::builder().build(manager).expect("db pool")
+    let database_url = env::var("REDISCLOUD_URL").unwrap();
+    println!("REDISCLOUD_URL: {:?}", database_url);
+    let manager = RedisConnectionManager::new(&*database_url).unwrap();
+    r2d2::Pool::builder()
+        .build(manager)
+        .expect("db pool is not created")
 }
 
 pub struct Conn(pub r2d2::PooledConnection<RedisConnectionManager>);
