@@ -1,12 +1,14 @@
-FROM rustlang/rust:nightly
+FROM rustlang/rust:nightly as build
 
 WORKDIR /usr/src/rusted-iron
 COPY . .
 
 RUN cargo build --release
-#EXPOSE 80
 
+FROM heroku/heroku:16
 RUN useradd -m iron
 USER iron
 
-CMD [ "sh", "-c", "env && ROCKET_PORT=${PORT} ROCKET_ENV=staging target/release/rusted-iron" ]
+COPY --from=build /usr/src/rusted-iron/target/release/rusted-iron .
+
+CMD [ "/bin/bash", "-c", "env && ls -al && ROCKET_PORT=${PORT} ROCKET_ENV=staging ./rusted-iron" ]
