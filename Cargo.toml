@@ -4,6 +4,8 @@ version = "0.0.2"
 authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
 
 [dependencies]
+rand = "0.4"
+uuid = { version = "0.5", features = ["serde", "v5"] }
 rocket = "0.3.6"
 rocket_codegen = "0.3.6"
 redis = "0.8.0"
