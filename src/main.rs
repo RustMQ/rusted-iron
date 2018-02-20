@@ -15,15 +15,19 @@ extern crate rocket_contrib;
 extern crate serde_derive;
 
 mod db;
+mod queue;
 mod message;
 
 use rocket::{Rocket};
 use rocket::http::{RawStr};
 use rocket_contrib::{Json, Value};
-use redis::RedisError;
+use redis::{RedisError, Connection};
 use rand::{thread_rng, Rng};
 use uuid::Uuid;
 use message::{Message};
+use db::{Conn};
+use queue::{Queue};
+
 
 #[get("/")]
 fn index() -> String {
@@ -43,7 +47,7 @@ fn redis_version(conn: db::Conn) -> Json {
 }
 
 #[get("/message/<key>")]
-fn redis_get_key(key: &RawStr, conn: db::Conn) -> Json<Value> {
+fn redis_get_key(key: &RawStr, conn: Conn) -> Json<Value> {
     let key_as_str = key.as_str();
     let result: Result<String, RedisError> = redis::Cmd::new().arg("HGET").arg(DEFAULT_QUEUE).arg(key_as_str).query(&*conn);
     match result {
@@ -63,8 +67,10 @@ fn redis_get_key(key: &RawStr, conn: db::Conn) -> Json<Value> {
 }
 
 #[post("/message", format = "application/json", data = "<message>")]
-fn redis_new_message(message: Json<Message>, conn: db::Conn) -> Json<Value> {
+fn redis_new_message(message: Json<Message>, conn: Conn) -> Json<Value> {
     println!("{:?}", message);
+    println!("Queue counter key: {}", Queue::get_counter_key().unwrap());
+    Message::push_message(message.0, &*conn);
     let s: String = thread_rng().gen_ascii_chars().take(10).collect();
     println!("{}", s);
     let totalrecv: u64 = redis::Cmd::new().arg("HGET").arg(DEFAULT_QUEUE).arg("totalrecv").query(&*conn).unwrap();
@@ -93,6 +99,18 @@ fn redis_new_message(message: Json<Message>, conn: db::Conn) -> Json<Value> {
     }
 }
 
+#[get("/<queue_id>")]
+fn get_queue_info(queue_id: i32, conn: Conn) -> Json<Value> {
+    let q = Queue {
+        id: Some(queue_id),
+        name: None,
+        totalrecv: None,
+        totalsent: None
+    };
+
+    return Json(json!(q))
+}
+
 #[error(404)]
 fn not_found() -> Json {
     Json(json!({
@@ -101,15 +119,18 @@ fn not_found() -> Json {
     }))
 }
 
-fn rocket() -> (Rocket, Option<db::Conn>) {
+fn rocket() -> (Rocket, Option<Conn>) {
     let pool = db::init_pool();
     println!("{:?}", pool);
-    let conn = Some(db::Conn(pool.get().expect("database connection")));
+    let conn = Some(Conn(pool.get().expect("database connection")));
 
     let rocket = rocket::ignite()
         .manage(pool)
         .mount("/", routes![index])
         .mount("/redis/", routes![redis_version, redis_get_key, redis_new_message])
+        .mount("/queue/", routes![
+            get_queue_info
+        ])
         .catch(errors![not_found]);
 
     (rocket, conn)
