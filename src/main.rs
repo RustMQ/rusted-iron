@@ -15,6 +15,7 @@ extern crate rocket_contrib;
 extern crate serde_derive;
 
 mod db;
+mod message;
 
 use rocket::{Rocket};
 use rocket::http::{RawStr};
@@ -22,6 +23,7 @@ use rocket_contrib::{Json, Value};
 use redis::RedisError;
 use rand::{thread_rng, Rng};
 use uuid::Uuid;
+use message::{Message};
 
 #[get("/")]
 fn index() -> String {
@@ -60,17 +62,13 @@ fn redis_get_key(key: &RawStr, conn: db::Conn) -> Json<Value> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Message {
-    body: String
-}
-
 #[post("/message", format = "application/json", data = "<message>")]
 fn redis_new_message(message: Json<Message>, conn: db::Conn) -> Json<Value> {
+    println!("{:?}", message);
     let s: String = thread_rng().gen_ascii_chars().take(10).collect();
     println!("{}", s);
     let totalrecv: u64 = redis::Cmd::new().arg("HGET").arg(DEFAULT_QUEUE).arg("totalrecv").query(&*conn).unwrap();
-    println!("Total message in queur: {}", totalrecv );
+    println!("Total message in queue: {}", totalrecv );
     let mid = Uuid::new_v5(&uuid::NAMESPACE_DNS, &s);
     println!("{}", mid);
     let result: Result<Vec<u64>, RedisError> = redis::pipe()
