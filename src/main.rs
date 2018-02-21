@@ -99,16 +99,33 @@ fn redis_new_message(message: Json<Message>, conn: Conn) -> Json<Value> {
     }
 }
 
-#[get("/<queue_id>")]
+#[get("/<queue_id>", format = "application/json")]
 fn get_queue_info(queue_id: i32, conn: Conn) -> Json<Value> {
     let q = Queue {
         id: Some(queue_id),
+        class: Some(String::from("pull")),
         name: None,
         totalrecv: None,
         totalsent: None
     };
 
     return Json(json!(q))
+}
+
+#[post("/<queue_id>/messages", format = "application/json", data = "<messages>")]
+fn post_message_to_queue(
+    queue_id: i32,
+    messages: Json<Vec<Message>>,
+    conn: Conn
+) -> Json<Value> {
+    let q: Queue = Queue::get_queue(queue_id, &*conn);
+    println!("Queue ID: {}", queue_id);
+    for x in &messages.0 {
+        println!("Body: {}", x.body);
+        // q.post_message(x);
+    }
+
+    return Json(json!(""))
 }
 
 #[error(404)]
@@ -129,7 +146,8 @@ fn rocket() -> (Rocket, Option<Conn>) {
         .mount("/", routes![index])
         .mount("/redis/", routes![redis_version, redis_get_key, redis_new_message])
         .mount("/queue/", routes![
-            get_queue_info
+            get_queue_info,
+            post_message_to_queue
         ])
         .catch(errors![not_found]);
 

@@ -3,8 +3,8 @@ use queue::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
-    id: Option<i32>,
-    body: String
+    pub id: Option<i32>,
+    pub body: String
 }
 
 const MESSAGE_PART_KEY: &'static str = "msg";
