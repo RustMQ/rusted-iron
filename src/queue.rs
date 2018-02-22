@@ -27,6 +27,47 @@ impl Queue {
             totalsent: None
         }
     }
+
+    fn get_queue_key(queue_id: i32) -> String {
+        let mut key = String::new();
+        key.push_str(DEFAULT_QUEUE_KEY);
+        key.push_str(&queue_id.to_string());
+
+        key.to_string()
+    }
+
+    fn new_from_hash(queue_id: i32, hash_map: HashMap<String, String>) -> Queue {
+        let mut queue = Queue::new();
+        queue.id = Some(queue_id);
+
+        match hash_map.get(&*"name") {
+            Some(v) => {
+                queue.name = Some(v.to_string());
+            },
+            _ => println!("Wrong key"),
+        }
+        match hash_map.get(&*"class") {
+            Some(v) => {
+                queue.class = Some(v.to_string());
+            },
+            _ => println!("Wrong key"),
+        }
+        match hash_map.get(&*"totalrecv") {
+            Some(v) => {
+                queue.totalrecv = Some(v.parse::<i32>().unwrap());
+            },
+            _ => println!("Wrong key"),
+        }
+        match hash_map.get(&*"totalsent") {
+            Some(v) => {
+                queue.totalsent = Some(v.parse::<i32>().unwrap());
+            },
+            _ => println!("Wrong key"),
+        }
+
+        queue
+    }
+
     pub fn get_counter_key() -> Result<String, QueueError> {
         let mut key = String::new();
         key.push_str(DEFAULT_QUEUE_KEY);
@@ -36,37 +77,9 @@ impl Queue {
     }
 
     pub fn get_queue(queue_id: i32, con: &Connection) -> Queue {
-        let mut key = String::new();
-        key.push_str(DEFAULT_QUEUE_KEY);
-        key.push_str(&queue_id.to_string());
-        let mut queue = Queue::new();
+        let key = Queue::get_queue_key(queue_id);
+        let result: HashMap<String, String> = cmd("HGETALL").arg(key).query(con).unwrap();
 
-        let result: HashMap<String, String> = cmd("HGETALL").arg(key.to_string()).query(con).unwrap();
-        println!("GET_G: {:?}", result);
-
-        match result.get(&*"class") {
-            Some(v) => {
-                println!("v: {}", v);
-                queue.class = Some(v.to_string());
-            },
-            _ => println!("Wrong key"),
-        }
-        match result.get(&*"totalrecv") {
-            Some(v) => {
-                println!("v: {}", v);
-                queue.totalrecv = Some(v.parse::<i32>().unwrap());
-            },
-            _ => println!("Wrong key"),
-        }
-        match result.get(&*"totalsent") {
-            Some(v) => {
-                println!("v: {}", v);
-                queue.totalsent = Some(v.parse::<i32>().unwrap());
-            },
-            _ => println!("Wrong key"),
-        }
-
-        println!("GET_Q: {:?}", queue);
-        queue
+        Queue::new_from_hash(queue_id, result)
     }
 }

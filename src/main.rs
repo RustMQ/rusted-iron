@@ -22,7 +22,7 @@ mod message;
 use rocket::{Rocket};
 use rocket::http::{RawStr};
 use rocket_contrib::{Json, Value};
-use redis::{RedisError, Connection};
+use redis::{RedisError};
 use rand::{thread_rng, Rng};
 use uuid::Uuid;
 use message::{Message};
@@ -120,7 +120,7 @@ fn post_message_to_queue(
     conn: Conn
 ) -> Json<Value> {
     let q: Queue = Queue::get_queue(queue_id, &*conn);
-    println!("Queue ID: {}", queue_id);
+    println!("Queue: {:?}", q);
     for x in &messages.0 {
         println!("Body: {}", x.body);
         // q.post_message(x);
