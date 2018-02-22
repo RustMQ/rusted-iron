@@ -14,6 +14,7 @@ extern crate rocket_contrib;
 #[macro_use]
 extern crate serde_derive;
 
+mod static_files;
 mod db;
 mod queue;
 mod message;
@@ -143,7 +144,7 @@ fn rocket() -> (Rocket, Option<Conn>) {
 
     let rocket = rocket::ignite()
         .manage(pool)
-        .mount("/", routes![index])
+        .mount("/", routes![index, static_files::all])
         .mount("/redis/", routes![redis_version, redis_get_key, redis_new_message])
         .mount("/queue/", routes![
             get_queue_info,
