@@ -71,7 +71,7 @@ fn redis_get_key(key: &RawStr, conn: Conn) -> Json<Value> {
 fn redis_new_message(message: Json<Message>, conn: Conn) -> Json<Value> {
     println!("{:?}", message);
     println!("Queue counter key: {}", Queue::get_counter_key().unwrap());
-    Message::push_message(message.0, &*conn);
+    Message::push_message(&message.0, &*conn);
     let s: String = thread_rng().gen_ascii_chars().take(10).collect();
     println!("{}", s);
     let totalrecv: u64 = redis::Cmd::new().arg("HGET").arg(DEFAULT_QUEUE).arg("totalrecv").query(&*conn).unwrap();
@@ -120,13 +120,13 @@ fn post_message_to_queue(
     conn: Conn
 ) -> Json<Value> {
     let q: Queue = Queue::get_queue(queue_id, &*conn);
-    println!("Queue: {:?}", q);
+    let mut result = Vec::new();
     for x in &messages.0 {
-        println!("Body: {}", x.body);
-        // q.post_message(x);
+        result.push(q.post_message(x, &*conn));
     }
+    println!("R: {:?}", result);
 
-    return Json(json!(""))
+    return Json(json!(result.len()))
 }
 
 #[error(404)]

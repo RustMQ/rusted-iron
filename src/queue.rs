@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use message::Message;
 use redis::*;
 
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
@@ -81,5 +82,11 @@ impl Queue {
         let result: HashMap<String, String> = cmd("HGETALL").arg(key).query(con).unwrap();
 
         Queue::new_from_hash(queue_id, result)
+    }
+
+    pub fn post_message(&self, message: &Message, con: &Connection) -> Result<i32, QueueError> {
+        println!("Q: {:?}", &self);
+
+        Ok(Message::push_message(message, con))
     }
 }
