@@ -18,6 +18,7 @@ mod static_files;
 mod db;
 mod queue;
 mod message;
+#[cfg(test)] mod tests;
 
 use rocket::{Rocket};
 use rocket::http::{RawStr};
@@ -30,9 +31,11 @@ use db::{Conn};
 use queue::{Queue};
 
 
-#[get("/")]
-fn index() -> String {
-    String::from(r#"{"goto":"http://www.iron.io"}"#)
+#[get("/", format = "application/json")]
+fn index() -> Json {
+    Json(json!({
+        "goto": "http://www.iron.io"
+    }))
 }
 
 const DEFAULT_QUEUE: &'static str = "queue:Q";
@@ -156,5 +159,6 @@ fn rocket() -> (Rocket, Option<Conn>) {
 }
 
 fn main() {
-    rocket().0.launch();
+    let (rocket, conn) = rocket();
+    rocket.launch();
 }
