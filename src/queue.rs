@@ -87,6 +87,6 @@ impl Queue {
     pub fn post_message(&self, message: &Message, con: &Connection) -> Result<i32, QueueError> {
         println!("Q: {:?}", &self);
 
-        Ok(Message::push_message(message, con))
+        Ok(Message::push_message(&self, message, con))
     }
 }

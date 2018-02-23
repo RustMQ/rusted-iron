@@ -38,8 +38,6 @@ fn index() -> Json {
     }))
 }
 
-const DEFAULT_QUEUE: &'static str = "queue:Q";
-
 #[get("/version")]
 fn redis_version(conn: db::Conn) -> Json {
     let info : redis::InfoDict = redis::cmd("INFO").query(&*conn).unwrap();
@@ -48,59 +46,6 @@ fn redis_version(conn: db::Conn) -> Json {
     Json(json!({
         "redis_version": redis_version
     }))
-}
-
-#[get("/message/<key>")]
-fn redis_get_key(key: &RawStr, conn: Conn) -> Json<Value> {
-    let key_as_str = key.as_str();
-    let result: Result<String, RedisError> = redis::Cmd::new().arg("HGET").arg(DEFAULT_QUEUE).arg(key_as_str).query(&*conn);
-    match result {
-        Ok(v) => {
-            return Json(json!({
-                "key": key_as_str.to_string(),
-                "value": String::from(v)
-            }))
-        },
-        Err(e) => {
-            return Json(json!({
-                "status": "error",
-                "reason": format!("Internal Server Error: {}", e)
-            }))
-        },
-    }
-}
-
-#[post("/message", format = "application/json", data = "<message>")]
-fn redis_new_message(message: Json<Message>, conn: Conn) -> Json<Value> {
-    println!("{:?}", message);
-    println!("Queue counter key: {}", Queue::get_counter_key().unwrap());
-    Message::push_message(&message.0, &*conn);
-    let s: String = thread_rng().gen_ascii_chars().take(10).collect();
-    println!("{}", s);
-    let totalrecv: u64 = redis::Cmd::new().arg("HGET").arg(DEFAULT_QUEUE).arg("totalrecv").query(&*conn).unwrap();
-    println!("Total message in queue: {}", totalrecv );
-    let mid = Uuid::new_v5(&uuid::NAMESPACE_DNS, &s);
-    println!("{}", mid);
-    let result: Result<Vec<u64>, RedisError> = redis::pipe()
-        .cmd("zadd").arg("queue").arg(totalrecv).arg(s.clone()).ignore()
-        .cmd("hset").arg(DEFAULT_QUEUE).arg(s.clone()).arg(mid.hyphenated().to_string()).ignore()
-        .cmd("hincrby").arg(DEFAULT_QUEUE).arg("totalrecv").arg(1).query(&*conn);
-
-    match result {
-        Ok(v) => {
-            println!("Messge: {:?}", v);
-            return Json(json!({
-                "mid": s.clone(),
-                "status": "ok"
-            }))
-        },
-        Err(e) => {
-            return Json(json!({
-                "status": "error",
-                "reason": format!("Internal Server Error: {}", e)
-            }))
-        },
-    }
 }
 
 #[get("/<queue_id>", format = "application/json")]
@@ -148,7 +93,7 @@ fn rocket() -> (Rocket, Option<Conn>) {
     let rocket = rocket::ignite()
         .manage(pool)
         .mount("/", routes![index, static_files::all])
-        .mount("/redis/", routes![redis_version, redis_get_key, redis_new_message])
+        .mount("/redis/", routes![redis_version])
         .mount("/queue/", routes![
             get_queue_info,
             post_message_to_queue
@@ -159,6 +104,6 @@ fn rocket() -> (Rocket, Option<Conn>) {
 }
 
 fn main() {
-    let (rocket, conn) = rocket();
+    let (rocket, _conn) = rocket();
     rocket.launch();
 }

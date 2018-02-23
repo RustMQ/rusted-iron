@@ -1,6 +1,7 @@
 extern crate redis;
 
 use redis::*;
+use queue::Queue;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
@@ -12,11 +13,7 @@ const MESSAGE_PART_KEY: &'static str = "msg";
 const MESSAGE_GEN_PART_KEY: &'static str = "counter";
 
 impl Message {
-    pub fn push_message(message: &Message, _con: &Connection) -> i32 {
-        // Step 1. INCR msg_counter queue:<queue_id>:msg:counter
-        // Step 2. ADD message to set of reserved messages
-        // Step 3. Update queue information
-        //
+    pub fn push_message(queue: &Queue, message: &Message, _con: &Connection) -> i32 {
         println!("Message: {:?}", message);
         let mid: i32 = cmd("GET").arg("queue:1:msg:counter").query(_con).unwrap();
         let mut key = String::new();
