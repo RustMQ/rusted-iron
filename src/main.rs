@@ -81,6 +81,20 @@ fn post_message_to_queue(
     }))
 }
 
+#[get("/<queue_id>/messages/<message_id>", format = "application/json")]
+fn get_message_from_queue(
+    queue_id: i32,
+    message_id: i32,
+    conn: Conn
+) -> Json<Value> {
+    let q: Queue = Queue::get_queue(queue_id, &*conn);
+    let m: Message = q.get_message(message_id, &*conn).expect("Message return");
+
+    return Json(json!({
+        "message": m
+    }))
+}
+
 #[error(404)]
 fn not_found() -> Json {
     Json(json!({
@@ -100,7 +114,8 @@ fn rocket() -> (Rocket, Option<Conn>) {
         .mount("/redis/", routes![redis_version])
         .mount("/queue/", routes![
             get_queue_info,
-            post_message_to_queue
+            post_message_to_queue,
+            get_message_from_queue
         ])
         .catch(errors![not_found]);
 

@@ -2,6 +2,7 @@ extern crate redis;
 
 use redis::*;
 use queue::Queue;
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
@@ -30,7 +31,6 @@ impl Message {
         let msg_id = redis::transaction(con, &[&msg_counter_key], |pipe| {
             let msg_id: i32 = cmd("GET").arg(&msg_counter_key).query(con).unwrap();
             msg_key.push_str(&msg_id.to_string());
-
             let response: Result<Vec<i32>, RedisError> = pipe
                     .cmd("HSET")
                         .arg(&msg_key)
@@ -63,5 +63,17 @@ impl Message {
         }).unwrap();
 
         msg_id
+    }
+
+    pub fn get_message(queue: &Queue, message_id: i32, con: &Connection) -> Message {
+        let queue_key = queue.get_queue_key();
+        let mut msg_key = String::new();
+        msg_key.push_str(&queue_key);
+        msg_key.push_str(":msg:");
+        msg_key.push_str(&message_id.to_string());
+
+        let result: HashMap<String, String> = cmd("HGETALL").arg(msg_key).query(con).unwrap();
+
+        Message::new_from_hash(message_id, result)
     }
 }

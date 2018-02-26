@@ -98,4 +98,8 @@ impl Queue {
         };
         Ok(Message::push_message(q, message, con))
     }
+
+    pub fn get_message(&self, message_id: i32, con: &Connection) -> Result<Message, QueueError> {
+        Ok(Message::get_message(&self, message_id, con))
+    }
 }
