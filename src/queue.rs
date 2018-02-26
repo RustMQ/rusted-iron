@@ -70,14 +70,6 @@ impl Queue {
         queue
     }
 
-    pub fn get_counter_key() -> Result<String, QueueError> {
-        let mut key = String::new();
-        key.push_str(DEFAULT_QUEUE_KEY);
-        key.push_str("1");
-
-        Ok(key.to_string())
-    }
-
     pub fn get_queue(queue_id: i32, con: &Connection) -> Queue {
         let mut q = Queue::new();
         q.id = Some(queue_id);
@@ -85,6 +77,15 @@ impl Queue {
         let result: HashMap<String, String> = cmd("HGETALL").arg(queue_key).query(con).unwrap();
 
         Queue::new_from_hash(queue_id, result)
+    }
+
+    pub fn get_message_counter_key(&self) -> String {
+        let mut key = String::new();
+        let queue_key = &self.get_queue_key();
+        key.push_str(queue_key);
+        key.push_str(":msg:counter");
+
+        key
     }
 
     pub fn post_message(&self, message: &Message, con: &Connection) -> Result<i32, QueueError> {
