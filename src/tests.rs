@@ -41,7 +41,7 @@ let (rocket, conn) = super::rocket();
         "ids": [],
         "msg": "Messages put on queue."
     });
-    println!("{:?}", expected);
+
     assert_eq!(response.status(), Status::Ok);
     assert_eq!(v, expected);
 }

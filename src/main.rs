@@ -30,7 +30,6 @@ use message::{Message};
 use db::{Conn};
 use queue::{Queue};
 
-
 #[get("/", format = "application/json")]
 fn index() -> Json {
     Json(json!({
@@ -70,11 +69,14 @@ fn post_message_to_queue(
     let q: Queue = Queue::get_queue(queue_id, &*conn);
     let mut result = Vec::new();
     for x in &messages.0 {
-        result.push(q.post_message(x, &*conn));
-    }
-    println!("R: {:?}", result);
+        let mid = q.post_message(x, &*conn).expect("Message put on queue.");
+        result.push(mid.to_string());
+    };
 
-    return Json(json!(result.len()))
+    return Json(json!({
+        "ids": result,
+        "msg": String::from("Messages put on queue.")
+    }))
 }
 
 #[error(404)]
