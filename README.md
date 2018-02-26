@@ -37,7 +37,7 @@ $ docker run -it --rm --link rust-redis:rust-redis --env-file ./env.list --name 
 Currently we don't have API or DB migration for Redis, that's why we need manually run commands below to initialize DB state:
 ```
 $ SET queue:1:msg:counter 1
-$ HMSET queue:1 class "pull" totalrecv 0 totalsent 0
+$ HMSET queue:1 name "sample queue" class "pull" totalrecv 0 totalsent 0
 ```
 
 **Note**: For integration testing we need to have an up and running Redis DB instance with initialized state.

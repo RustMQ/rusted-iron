@@ -46,25 +46,25 @@ impl Queue {
             Some(v) => {
                 queue.name = Some(v.to_string());
             },
-            _ => println!("Wrong key"),
+            _ => println!("Wrong key name"),
         }
         match hash_map.get(&*"class") {
             Some(v) => {
                 queue.class = Some(v.to_string());
             },
-            _ => println!("Wrong key"),
+            _ => println!("Wrong key class"),
         }
         match hash_map.get(&*"totalrecv") {
             Some(v) => {
                 queue.totalrecv = Some(v.parse::<i32>().unwrap());
             },
-            _ => println!("Wrong key"),
+            _ => println!("Wrong key totalrecv"),
         }
         match hash_map.get(&*"totalsent") {
             Some(v) => {
                 queue.totalsent = Some(v.parse::<i32>().unwrap());
             },
-            _ => println!("Wrong key"),
+            _ => println!("Wrong key totalsent"),
         }
 
         queue
