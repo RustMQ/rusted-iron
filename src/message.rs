@@ -16,7 +16,7 @@ impl Message {
     pub fn push_message(queue: &Queue, message: &Message, con: &Connection) -> i32 {
         println!("Message: {:?}", message);
         let msg_counter_key = "queue:1:msg:counter";
-        let queue_key = "queue:1";
+        let queue_key = queue.get_queue_key();
         let mut msg_key = String::new();
         msg_key.push_str(&queue_key);
         msg_key.push_str(":msg:");
@@ -34,7 +34,7 @@ impl Message {
                         .arg("queue:1:msg:counter")
                         .ignore()
                     .cmd("HINCRBY")
-                        .arg(queue_key)
+                        .arg(&queue_key)
                         .arg("totalrecv")
                         .arg("1")
                         .ignore()

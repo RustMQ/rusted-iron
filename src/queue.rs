@@ -29,12 +29,13 @@ impl Queue {
         }
     }
 
-    fn get_queue_key(queue_id: i32) -> String {
+    pub fn get_queue_key(&self) -> String {
+        let queue_id = &self.id.expect("id value");
         let mut key = String::new();
         key.push_str(DEFAULT_QUEUE_KEY);
         key.push_str(&queue_id.to_string());
 
-        key.to_string()
+        key
     }
 
     fn new_from_hash(queue_id: i32, hash_map: HashMap<String, String>) -> Queue {
@@ -78,8 +79,10 @@ impl Queue {
     }
 
     pub fn get_queue(queue_id: i32, con: &Connection) -> Queue {
-        let key = Queue::get_queue_key(queue_id);
-        let result: HashMap<String, String> = cmd("HGETALL").arg(key).query(con).unwrap();
+        let mut q = Queue::new();
+        q.id = Some(queue_id);
+        let queue_key = q.get_queue_key();
+        let result: HashMap<String, String> = cmd("HGETALL").arg(queue_key).query(con).unwrap();
 
         Queue::new_from_hash(queue_id, result)
     }
