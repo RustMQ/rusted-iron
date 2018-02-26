@@ -25,7 +25,7 @@ fn index() {
 
 #[test]
 fn push_message_with_empty_list() {
-let (rocket, conn) = super::rocket();
+    let (rocket, conn) = super::rocket();
     let client = Client::new(rocket).expect("valid rocket instance");
     conn.expect("connection is valid");
 
@@ -44,4 +44,39 @@ let (rocket, conn) = super::rocket();
 
     assert_eq!(response.status(), Status::Ok);
     assert_eq!(v, expected);
+    // TODO: get queue and check totalrecv counter
+}
+
+#[test]
+fn push_message_with_two_messages() {
+    let (rocket, conn) = super::rocket();
+    let client = Client::new(rocket).expect("valid rocket instance");
+    conn.expect("connection is valid");
+
+    let mut response: LocalResponse = client.post("/queue/1/messages")
+        .header(ContentType::JSON)
+        .body(r#"[
+	            {
+		            "body": "Bla"
+	            },
+	            {
+		            "body": "Bla2"
+	            }
+        ]"#)
+        .dispatch();
+
+    let body_str: String = response.body_string().unwrap();
+    let v: Value = serde_json::from_str(&body_str).expect("response json");
+
+    let expected = json!({
+        "ids": [
+            "1",
+            "2"
+        ],
+        "msg": "Messages put on queue."
+    });
+
+    assert_eq!(response.status(), Status::Ok);
+    assert_eq!(v, expected);
+    // TODO: get queue and check totalrecv counter
 }
