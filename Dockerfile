@@ -1,12 +1,24 @@
-FROM rustlang/rust:nightly
+FROM rustlang/rust:nightly as build
 
 WORKDIR /usr/src/rusted-iron
-COPY . .
+
+ADD Cargo.toml Cargo.toml
+
+ADD Cargo.lock Cargo.lock
+
+ADD src src
+ADD static static
+
+RUN cargo update
 
 RUN cargo build --release
-#EXPOSE 80
 
+FROM heroku/heroku:16
 RUN useradd -m iron
 USER iron
 
-CMD ROCKET_PORT=$PORT ROCKET_ENV=staging target/release/rusted-iron
+WORKDIR /app
+COPY --from=build /usr/src/rusted-iron/target/release/rusted-iron .
+COPY --from=build /usr/src/rusted-iron/static static
+
+CMD [ "/bin/bash", "-c", "env && ls -al && ROCKET_PORT=${PORT} ROCKET_ENV=${ROCKET_ENV} ./rusted-iron" ]
