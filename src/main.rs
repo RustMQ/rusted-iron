@@ -22,8 +22,7 @@ mod message;
 
 use rocket::{Rocket};
 use rocket_contrib::{Json, Value};
-use redis::{RedisError};
-use db::{Conn};
+use db::{pool, RedisConnection};
 use queue::{Queue};
 use message::{Message};
 
@@ -35,8 +34,8 @@ fn index() -> Json {
 }
 
 #[get("/version")]
-fn redis_version(conn: db::Conn) -> Json {
-    let info : redis::InfoDict = redis::cmd("INFO").query(&*conn).unwrap();
+fn redis_version(conn: RedisConnection) -> Json {
+    let info : redis::InfoDict = redis::cmd("INFO").query(&*(conn.0)).unwrap();
     let redis_version: String = info.get("redis_version").unwrap();
 
     Json(json!({
@@ -45,7 +44,7 @@ fn redis_version(conn: db::Conn) -> Json {
 }
 
 #[get("/<queue_id>", format = "application/json")]
-fn get_queue_info(queue_id: String, conn: Conn) -> Json<Value> {
+fn get_queue_info(queue_id: String, _conn: RedisConnection) -> Json<Value> {
     let q = Queue {
         id: Some(queue_id),
         class: Some(String::from("pull")),
@@ -61,7 +60,7 @@ fn get_queue_info(queue_id: String, conn: Conn) -> Json<Value> {
 fn post_message_to_queue(
     queue_id: String,
     messages: Json<Vec<Message>>,
-    conn: Conn
+    conn: RedisConnection
 ) -> Json<Value> {
     let q: Queue = Queue::get_queue(&queue_id, &*conn);
     println!("Q: {:?}", q);
@@ -83,7 +82,7 @@ fn post_message_to_queue(
 fn get_message_from_queue(
     queue_id: String,
     message_id: String,
-    conn: Conn
+    conn: RedisConnection
 ) -> Json<Value> {
     let m: Message = Queue::get_message(&queue_id, &message_id, &*conn).expect("Message return");
 
@@ -100,13 +99,9 @@ fn not_found() -> Json {
     }))
 }
 
-fn rocket() -> (Rocket, Option<Conn>) {
-    let pool = db::init_pool();
-    println!("{:?}", pool);
-    let conn = Some(Conn(pool.get().expect("database connection")));
-
+fn rocket() -> Rocket {
     let rocket = rocket::ignite()
-        .manage(pool)
+        .manage(pool())
         .mount("/", routes![index, static_files::all])
         .mount("/redis/", routes![redis_version])
         .mount("/queue/", routes![
@@ -116,10 +111,10 @@ fn rocket() -> (Rocket, Option<Conn>) {
         ])
         .catch(errors![not_found]);
 
-    (rocket, conn)
+    rocket
 }
 
 fn main() {
-    let (rocket, _conn) = rocket();
+    let rocket = rocket();
     rocket.launch();
 }

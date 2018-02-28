@@ -1,15 +1,14 @@
 use super::{rocket, main};
 use rocket::local::*;
 use rocket::http::{ContentType, Status};
-use db::Conn;
 use serde_json;
 use serde_json::{Value, Error};
 
 #[test]
 fn index() {
-    let (rocket, conn) = super::rocket();
+    let rocket = super::rocket();
     let client = Client::new(rocket).expect("valid rocket instance");
-    conn.expect("connection is valid");
+
     let mut response: LocalResponse = client.get("/").dispatch();
     let js: String = response.body_string().unwrap();
 
@@ -25,9 +24,8 @@ fn index() {
 
 #[test]
 fn push_message_with_empty_list() {
-    let (rocket, conn) = super::rocket();
+    let rocket = super::rocket();
     let client = Client::new(rocket).expect("valid rocket instance");
-    conn.expect("connection is valid");
 
     let mut response: LocalResponse = client.post("/queue/1/messages")
         .header(ContentType::JSON)
@@ -49,9 +47,8 @@ fn push_message_with_empty_list() {
 
 #[test]
 fn push_message_with_two_messages() {
-    let (rocket, conn) = super::rocket();
+    let rocket = super::rocket();
     let client = Client::new(rocket).expect("valid rocket instance");
-    conn.expect("connection is valid");
 
     let mut response: LocalResponse = client.post("/queue/1/messages")
         .header(ContentType::JSON)
@@ -83,9 +80,8 @@ fn push_message_with_two_messages() {
 
 #[test]
 fn get_message() {
-    let (rocket, conn) = super::rocket();
+    let rocket = super::rocket();
     let client = Client::new(rocket).expect("valid rocket instance");
-    conn.expect("connection is valid");
 
     let mut response: LocalResponse = client.get("/queue/1/messages/1")
         .header(ContentType::JSON)
@@ -109,9 +105,8 @@ fn get_message() {
 #[test]
 #[ignore]
 fn get_message_not_found() {
-    let (rocket, conn) = super::rocket();
+    let rocket = super::rocket();
     let client = Client::new(rocket).expect("valid rocket instance");
-    conn.expect("connection is valid");
 
     let mut response: LocalResponse = client.get("/queue/1/messages/0")
         .header(ContentType::JSON)

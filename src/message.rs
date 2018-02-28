@@ -42,7 +42,7 @@ impl Message {
         msg_key.push_str(":msg:");
         let msg_body: String = message.body.expect("Message body");
 
-        let msg_id = redis::transaction(con, &[&msg_counter_key], |pipe| {
+        let msg_id = redis::transaction(con, &[&msg_counter_key, &queue_key], |pipe| {
             let msg_id: i32 = cmd("GET").arg(&msg_counter_key).query(con).unwrap();
             msg_key.push_str(&msg_id.to_string());
             let response: Result<Vec<i32>, RedisError> = pipe
@@ -90,7 +90,7 @@ impl Message {
         if result.is_empty() {
             return Message::new()
         }
-        
+
         Message::new_from_hash(message_id.to_string(), result)
     }
 }
