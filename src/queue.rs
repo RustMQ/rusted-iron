@@ -87,7 +87,7 @@ impl Queue {
         key
     }
 
-    pub fn post_message(queue: Queue, message: &Message, con: &Connection) -> Result<i32, QueueError> {
+    pub fn post_message(queue: Queue, message: Message, con: &Connection) -> Result<i32, QueueError> {
         println!("Q: {:?}", queue);
         let q = Queue {
             id: queue.id,

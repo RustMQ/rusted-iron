@@ -68,8 +68,10 @@ fn post_message_to_queue(
 ) -> Json<Value> {
     let q: Queue = Queue::get_queue(&queue_id, &*conn);
     let mut result = Vec::new();
-    for x in &messages.0 {
-        let mid = Queue::post_message(q.clone(), x, &*conn).expect("Message put on queue.");
+    for x in messages.0 {
+        let mut m: Message = Message::new();
+        m.body = x.body;
+        let mid = Queue::post_message(q.clone(), m, &*conn).expect("Message put on queue.");
         result.push(mid.to_string());
     };
 

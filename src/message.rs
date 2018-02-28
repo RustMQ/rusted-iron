@@ -5,12 +5,19 @@ use queue::Queue;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
-    pub id: Option<i32>,
-    pub body: String
+    pub id: Option<String>,
+    pub body: Option<String>
 }
 
 impl Message {
-    pub fn push_message(queue: Queue, message: &Message, con: &Connection) -> i32 {
+    pub fn new() -> Message {
+        Message {
+            id: None,
+            body: None
+        }
+    }
+
+    pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
         println!("Message: {:?}", message);
         let queue_id: String = queue.id.expect("Message ID");
         let queue_key: String = Queue::get_queue_key(&queue_id);
@@ -18,6 +25,7 @@ impl Message {
         let mut msg_key = String::new();
         msg_key.push_str(&queue_key);
         msg_key.push_str(":msg:");
+        let msg_body: String = message.body.expect("Message body");
 
         let msg_id = redis::transaction(con, &[&msg_counter_key], |pipe| {
             let msg_id: i32 = cmd("GET").arg(&msg_counter_key).query(con).unwrap();
@@ -27,7 +35,7 @@ impl Message {
                     .cmd("HSET")
                         .arg(&msg_key)
                         .arg("body")
-                        .arg(&message.body)
+                        .arg(&msg_body)
                     .cmd("INCR")
                         .arg(&msg_counter_key)
                         .ignore()
