@@ -21,14 +21,10 @@ mod message;
 #[cfg(test)] mod tests;
 
 use rocket::{Rocket};
-use rocket::http::{RawStr};
 use rocket_contrib::{Json, Value};
-use redis::{RedisError};
-use rand::{thread_rng, Rng};
-use uuid::Uuid;
-use message::{Message};
-use db::{Conn};
+use db::{pool, RedisConnection};
 use queue::{Queue};
+use message::{Message};
 
 #[get("/", format = "application/json")]
 fn index() -> Json {
@@ -38,8 +34,8 @@ fn index() -> Json {
 }
 
 #[get("/version")]
-fn redis_version(conn: db::Conn) -> Json {
-    let info : redis::InfoDict = redis::cmd("INFO").query(&*conn).unwrap();
+fn redis_version(conn: RedisConnection) -> Json {
+    let info : redis::InfoDict = redis::cmd("INFO").query(&*(conn.0)).unwrap();
     let redis_version: String = info.get("redis_version").unwrap();
 
     Json(json!({
@@ -48,7 +44,7 @@ fn redis_version(conn: db::Conn) -> Json {
 }
 
 #[get("/<queue_id>", format = "application/json")]
-fn get_queue_info(queue_id: i32, conn: Conn) -> Json<Value> {
+fn get_queue_info(queue_id: String, _conn: RedisConnection) -> Json<Value> {
     let q = Queue {
         id: Some(queue_id),
         class: Some(String::from("pull")),
@@ -62,20 +58,36 @@ fn get_queue_info(queue_id: i32, conn: Conn) -> Json<Value> {
 
 #[post("/<queue_id>/messages", format = "application/json", data = "<messages>")]
 fn post_message_to_queue(
-    queue_id: i32,
+    queue_id: String,
     messages: Json<Vec<Message>>,
-    conn: Conn
+    conn: RedisConnection
 ) -> Json<Value> {
-    let q: Queue = Queue::get_queue(queue_id, &*conn);
+    let q: Queue = Queue::get_queue(&queue_id, &*conn);
+    println!("Q: {:?}", q);
     let mut result = Vec::new();
-    for x in &messages.0 {
-        let mid = q.post_message(x, &*conn).expect("Message put on queue.");
+    for x in messages.0 {
+        let mut m: Message = Message::new();
+        m.body = x.body;
+        let mid = Queue::post_message(q.clone(), m, &*conn).expect("Message put on queue.");
         result.push(mid.to_string());
     };
 
     return Json(json!({
         "ids": result,
         "msg": String::from("Messages put on queue.")
+    }))
+}
+
+#[get("/<queue_id>/messages/<message_id>", format = "application/json")]
+fn get_message_from_queue(
+    queue_id: String,
+    message_id: String,
+    conn: RedisConnection
+) -> Json<Value> {
+    let m: Message = Queue::get_message(&queue_id, &message_id, &*conn).expect("Message return");
+
+    return Json(json!({
+        "message": m
     }))
 }
 
@@ -87,25 +99,22 @@ fn not_found() -> Json {
     }))
 }
 
-fn rocket() -> (Rocket, Option<Conn>) {
-    let pool = db::init_pool();
-    println!("{:?}", pool);
-    let conn = Some(Conn(pool.get().expect("database connection")));
-
+fn rocket() -> Rocket {
     let rocket = rocket::ignite()
-        .manage(pool)
+        .manage(pool())
         .mount("/", routes![index, static_files::all])
         .mount("/redis/", routes![redis_version])
         .mount("/queue/", routes![
             get_queue_info,
-            post_message_to_queue
+            post_message_to_queue,
+            get_message_from_queue
         ])
         .catch(errors![not_found]);
 
-    (rocket, conn)
+    rocket
 }
 
 fn main() {
-    let (rocket, _conn) = rocket();
+    let rocket = rocket();
     rocket.launch();
 }

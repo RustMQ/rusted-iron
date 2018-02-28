@@ -7,9 +7,9 @@ pub enum QueueError {
     CounterKeyMissing
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Queue {
-    pub id: Option<i32>,
+    pub id: Option<String>,
     pub name: Option<String>,
     pub class: Option<String>,
     pub totalrecv: Option<i32>,
@@ -29,16 +29,15 @@ impl Queue {
         }
     }
 
-    pub fn get_queue_key(&self) -> String {
-        let queue_id = &self.id.expect("id value");
+    pub fn get_queue_key(queue_id: &String) -> String {
         let mut key = String::new();
         key.push_str(DEFAULT_QUEUE_KEY);
-        key.push_str(&queue_id.to_string());
+        key.push_str(&queue_id);
 
         key
     }
 
-    fn new_from_hash(queue_id: i32, hash_map: HashMap<String, String>) -> Queue {
+    fn new_from_hash(queue_id: String, hash_map: HashMap<String, String>) -> Queue {
         let mut queue = Queue::new();
         queue.id = Some(queue_id);
 
@@ -70,27 +69,36 @@ impl Queue {
         queue
     }
 
-    pub fn get_queue(queue_id: i32, con: &Connection) -> Queue {
+    pub fn get_queue(queue_id: &String, con: &Connection) -> Queue {
         let mut q = Queue::new();
-        q.id = Some(queue_id);
-        let queue_key = q.get_queue_key();
+        q.id = Some(queue_id.to_string());
+        let queue_key = Queue::get_queue_key(queue_id);
         let result: HashMap<String, String> = cmd("HGETALL").arg(queue_key).query(con).unwrap();
 
-        Queue::new_from_hash(queue_id, result)
+        Queue::new_from_hash(queue_id.to_string(), result)
     }
 
-    pub fn get_message_counter_key(&self) -> String {
+    pub fn get_message_counter_key(queue_id: &String) -> String {
         let mut key = String::new();
-        let queue_key = &self.get_queue_key();
-        key.push_str(queue_key);
+        let queue_key = Queue::get_queue_key(queue_id);
+        key.push_str(&queue_key);
         key.push_str(":msg:counter");
 
         key
     }
 
-    pub fn post_message(&self, message: &Message, con: &Connection) -> Result<i32, QueueError> {
-        println!("Q: {:?}", &self);
+    pub fn post_message(queue: Queue, message: Message, con: &Connection) -> Result<i32, QueueError> {
+        let q = Queue {
+            id: queue.id,
+            class: queue.class,
+            name: queue.name,
+            totalrecv: queue.totalrecv,
+            totalsent: queue.totalsent
+        };
+        Ok(Message::push_message(q, message, con))
+    }
 
-        Ok(Message::push_message(&self, message, con))
+    pub fn get_message(queue_id: &String, message_id: &String, con: &Connection) -> Result<Message, QueueError> {
+        Ok(Message::get_message(queue_id, message_id, con))
     }
 }
