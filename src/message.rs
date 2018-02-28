@@ -10,10 +10,11 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn push_message(queue: &Queue, message: &Message, con: &Connection) -> i32 {
+    pub fn push_message(queue: Queue, message: &Message, con: &Connection) -> i32 {
         println!("Message: {:?}", message);
-        let queue_key = queue.get_queue_key();
-        let msg_counter_key = queue.get_message_counter_key();
+        let queue_id: String = queue.id.expect("Message ID");
+        let queue_key: String = Queue::get_queue_key(&queue_id);
+        let msg_counter_key = Queue::get_message_counter_key(&queue_id);
         let mut msg_key = String::new();
         msg_key.push_str(&queue_key);
         msg_key.push_str(":msg:");

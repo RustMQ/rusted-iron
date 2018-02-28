@@ -48,7 +48,7 @@ fn redis_version(conn: db::Conn) -> Json {
 }
 
 #[get("/<queue_id>", format = "application/json")]
-fn get_queue_info(queue_id: i32, conn: Conn) -> Json<Value> {
+fn get_queue_info(queue_id: String, conn: Conn) -> Json<Value> {
     let q = Queue {
         id: Some(queue_id),
         class: Some(String::from("pull")),
@@ -62,14 +62,14 @@ fn get_queue_info(queue_id: i32, conn: Conn) -> Json<Value> {
 
 #[post("/<queue_id>/messages", format = "application/json", data = "<messages>")]
 fn post_message_to_queue(
-    queue_id: i32,
+    queue_id: String,
     messages: Json<Vec<Message>>,
     conn: Conn
 ) -> Json<Value> {
-    let q: Queue = Queue::get_queue(queue_id, &*conn);
+    let q: Queue = Queue::get_queue(&queue_id, &*conn);
     let mut result = Vec::new();
     for x in &messages.0 {
-        let mid = q.post_message(x, &*conn).expect("Message put on queue.");
+        let mid = Queue::post_message(q.clone(), x, &*conn).expect("Message put on queue.");
         result.push(mid.to_string());
     };
 
