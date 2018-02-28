@@ -18,6 +18,20 @@ impl Message {
         }
     }
 
+    pub fn new_from_hash(message_id: String, hash_map: HashMap<String, String>) -> Message {
+        let mut msg = Message::new();
+        msg.id = Some(message_id);
+
+        match hash_map.get(&*"body") {
+            Some(v) => {
+                msg.body = Some(v.to_string());
+            },
+            _ => println!("Wrong key body"),
+        }
+
+        msg
+    }
+
     pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
         println!("Message: {:?}", message);
         let queue_id: String = queue.id.expect("Message ID");
@@ -65,8 +79,8 @@ impl Message {
         msg_id
     }
 
-    pub fn get_message(queue: &Queue, message_id: i32, con: &Connection) -> Message {
-        let queue_key = queue.get_queue_key();
+    pub fn get_message(queue_id: &String, message_id: &String, con: &Connection) -> Message {
+        let queue_key = Queue::get_queue_key(queue_id);
         let mut msg_key = String::new();
         msg_key.push_str(&queue_key);
         msg_key.push_str(":msg:");
@@ -74,6 +88,6 @@ impl Message {
 
         let result: HashMap<String, String> = cmd("HGETALL").arg(msg_key).query(con).unwrap();
 
-        Message::new_from_hash(message_id, result)
+        Message::new_from_hash(message_id.to_string(), result)
     }
 }

@@ -83,12 +83,11 @@ fn post_message_to_queue(
 
 #[get("/<queue_id>/messages/<message_id>", format = "application/json")]
 fn get_message_from_queue(
-    queue_id: i32,
-    message_id: i32,
+    queue_id: String,
+    message_id: String,
     conn: Conn
 ) -> Json<Value> {
-    let q: Queue = Queue::get_queue(queue_id, &*conn);
-    let m: Message = q.get_message(message_id, &*conn).expect("Message return");
+    let m: Message = Queue::get_message(&queue_id, &message_id, &*conn).expect("Message return");
 
     return Json(json!({
         "message": m
