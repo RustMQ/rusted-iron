@@ -87,7 +87,10 @@ impl Message {
         msg_key.push_str(&message_id.to_string());
 
         let result: HashMap<String, String> = cmd("HGETALL").arg(msg_key).query(con).unwrap();
-
+        if result.is_empty() {
+            return Message::new()
+        }
+        
         Message::new_from_hash(message_id.to_string(), result)
     }
 }

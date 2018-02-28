@@ -21,14 +21,11 @@ mod message;
 #[cfg(test)] mod tests;
 
 use rocket::{Rocket};
-use rocket::http::{RawStr};
 use rocket_contrib::{Json, Value};
 use redis::{RedisError};
-use rand::{thread_rng, Rng};
-use uuid::Uuid;
-use message::{Message};
 use db::{Conn};
 use queue::{Queue};
+use message::{Message};
 
 #[get("/", format = "application/json")]
 fn index() -> Json {
@@ -67,6 +64,7 @@ fn post_message_to_queue(
     conn: Conn
 ) -> Json<Value> {
     let q: Queue = Queue::get_queue(&queue_id, &*conn);
+    println!("Q: {:?}", q);
     let mut result = Vec::new();
     for x in messages.0 {
         let mut m: Message = Message::new();
