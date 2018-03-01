@@ -126,3 +126,23 @@ fn get_message_not_found() {
     // assert_eq!(v, expected);
     // TODO: get queue and check totalrecv counter
 }
+
+#[test]
+fn delete_message_by_id() {
+    let rocket = super::rocket();
+    let client = Client::new(rocket).expect("valid rocket instance");
+
+    let mut response: LocalResponse = client.delete("/queue/1/messages/1")
+        .header(ContentType::JSON)
+        .dispatch();
+
+    let body_str: String = response.body_string().unwrap();
+    let v: Value = serde_json::from_str(&body_str).expect("response json");
+
+    let expected = json!({
+        "msg": "Deleted"
+    });
+
+    assert_eq!(response.status(), Status::Ok);
+    assert_eq!(v, expected);
+}
