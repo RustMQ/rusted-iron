@@ -101,4 +101,8 @@ impl Queue {
     pub fn get_message(queue_id: &String, message_id: &String, con: &Connection) -> Result<Message, QueueError> {
         Ok(Message::get_message(queue_id, message_id, con))
     }
+
+    pub fn delete_message(queue_id: &String, message_id: &String, con: &Connection) -> bool {
+        Message::delete_message(queue_id, message_id, con)
+    }
 }

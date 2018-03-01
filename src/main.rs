@@ -91,6 +91,22 @@ fn get_message_from_queue(
     }))
 }
 
+#[delete("/<queue_id>/messages/<message_id>", format = "application/json")]
+fn delete_message_from_queue(
+    queue_id: String,
+    message_id: String,
+    conn: RedisConnection
+) -> Option<Json<Value>> {
+    if Queue::delete_message(&queue_id, &message_id, &*conn) {
+        return Some(Json(json!({
+            "msg": "Deleted"
+        })))
+    }
+    else {
+        return None
+    }
+}
+
 #[error(404)]
 fn not_found() -> Json {
     Json(json!({
@@ -107,7 +123,8 @@ fn rocket() -> Rocket {
         .mount("/queue/", routes![
             get_queue_info,
             post_message_to_queue,
-            get_message_from_queue
+            get_message_from_queue,
+            delete_message_from_queue
         ])
         .catch(errors![not_found]);
 

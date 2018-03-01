@@ -93,4 +93,16 @@ impl Message {
 
         Message::new_from_hash(message_id.to_string(), result)
     }
+
+    pub fn delete_message(queue_id: &String, message_id: &String, con: &Connection) -> bool {
+        let queue_key = Queue::get_queue_key(queue_id);
+        let mut key = String::new();
+        key.push_str(&queue_key);
+        key.push_str(":msg:");
+        key.push_str(&message_id.to_string());
+        
+        let result: i32 = cmd("DEL").arg(key).query(con).unwrap();
+
+        result >= 1
+    }
 }
