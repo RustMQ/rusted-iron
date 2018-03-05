@@ -10,6 +10,14 @@ pub struct Message {
     pub body: Option<String>
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReserveMessageParams {
+    pub n: i32
+}
+
+pub const UNRESERVED_MSG_KEY_PART: &'static str = ":unreserved";
+pub const RESERVED_MSG_KEY_PART: &'static str = ":reserved";
+
 impl Message {
     pub fn new() -> Message {
         Message {
@@ -36,7 +44,7 @@ impl Message {
         println!("Message: {:?}", message);
         let queue_id: String = queue.id.expect("Message ID");
         let queue_key: String = Queue::get_queue_key(&queue_id);
-        let msg_counter_key = Queue::get_message_counter_key(&queue_id);
+        let msg_counter_key = Queue::get_message_counter_key(&queue_id, &UNRESERVED_MSG_KEY_PART.to_string());
         let mut msg_key = String::new();
         msg_key.push_str(&queue_key);
         msg_key.push_str(":msg:");
@@ -100,7 +108,7 @@ impl Message {
         key.push_str(&queue_key);
         key.push_str(":msg:");
         key.push_str(&message_id.to_string());
-        
+
         let result: i32 = cmd("DEL").arg(key).query(con).unwrap();
 
         result >= 1

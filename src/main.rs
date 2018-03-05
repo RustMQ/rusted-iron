@@ -24,7 +24,7 @@ use rocket::{Rocket};
 use rocket_contrib::{Json, Value};
 use db::{pool, RedisConnection};
 use queue::{Queue};
-use message::{Message};
+use message::{Message, ReserveMessageParams};
 
 #[get("/", format = "application/json")]
 fn index() -> Json {
@@ -107,6 +107,20 @@ fn delete_message_from_queue(
     }
 }
 
+#[post("/<queue_id>/reservations", format = "application/json", data="<reserve_params>")]
+fn reserve_messages(
+    queue_id: String,
+    reserve_params: Json<ReserveMessageParams>,
+    conn: RedisConnection
+) -> Option<Json<Value>> {
+    println!("Reserve params: {:?}", reserve_params);
+
+    let rp = reserve_params.into_inner();
+    println!("Reserve params: {:?}", rp);
+
+    return None
+}
+
 #[error(404)]
 fn not_found() -> Json {
     Json(json!({
@@ -124,7 +138,8 @@ fn rocket() -> Rocket {
             get_queue_info,
             post_message_to_queue,
             get_message_from_queue,
-            delete_message_from_queue
+            delete_message_from_queue,
+            reserve_messages
         ])
         .catch(errors![not_found]);
 
