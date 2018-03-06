@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use message::Message;
+use message::{Message, ReserveMessageParams};
 use redis::*;
 
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
@@ -108,5 +108,16 @@ impl Queue {
 
     pub fn delete_message(queue_id: &String, message_id: &String, con: &Connection) -> bool {
         Message::delete_message(queue_id, message_id, con)
+    }
+
+    pub fn reserve_messages(queue_id: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Vec<Message> {
+        let mut result = Vec::new();
+
+        for m in Message::reserve_messages(queue_id, reserve_params, con) {
+            println!("Message: {:?}", m);
+            result.push(m);
+        }
+
+        result
     }
 }

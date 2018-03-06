@@ -118,7 +118,11 @@ fn reserve_messages(
     let rp = reserve_params.into_inner();
     println!("Reserve params: {:?}", rp);
 
-    return None
+    let results: Vec<Message> = Queue::reserve_messages(&queue_id, &rp, &*conn);
+
+    return Some(Json(json!({
+        "messages": results
+    })))
 }
 
 #[error(404)]
