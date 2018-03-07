@@ -17,8 +17,6 @@ pub struct ReserveMessageParams {
     pub n: i32
 }
 
-pub const UNRESERVED_MSG_KEY_PART: &'static str = ":unreserved";
-pub const RESERVED_MSG_KEY_PART: &'static str = ":reserved";
 pub const UNRESERVED_SET_KEY: &'static str = "queue:1:unreserved:msg";
 pub const RESERVED_SET_KEY: &'static str = "queue:1:reserved:msg";
 
@@ -56,7 +54,7 @@ impl Message {
         println!("Message: {:?}", message);
         let queue_id: String = queue.id.expect("Queue ID");
         let queue_key: String = Queue::get_queue_key(&queue_id);
-        let msg_counter_key = Queue::get_message_counter_key(&queue_id, &UNRESERVED_MSG_KEY_PART.to_string());
+        let msg_counter_key = Queue::get_message_counter_key(&queue_id);
         let mut msg_key = String::new();
         msg_key.push_str(&queue_key);
         msg_key.push_str(":msg:");
@@ -74,7 +72,7 @@ impl Message {
                         .arg("id")
                         .arg(&msg_id.to_string())
                     .cmd("ZADD")
-                        .arg("queue:1:unreserved:msg")
+                        .arg(&UNRESERVED_SET_KEY.to_string())
                         .arg(&msg_id.to_string())
                         .arg(&msg_key)
                         .ignore()
@@ -137,12 +135,7 @@ impl Message {
     pub fn reserve_messages(queue_id: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Vec<Message> {
         let mut result = Vec::new();
 
-        let queue_key = Queue::get_queue_key(queue_id);
-        let mut unreserved_msg_key = String::new();
-        unreserved_msg_key.push_str(&queue_key);
-        unreserved_msg_key.push_str(&UNRESERVED_MSG_KEY_PART.to_string());
-        unreserved_msg_key.push_str(":msg");
-        let unreserved_msg_key_list: Result<Vec<(String, isize)>, RedisError> = con.zrangebyscore_limit_withscores(&unreserved_msg_key, "0", "+inf", 0, reserve_params.n as isize);
+        let unreserved_msg_key_list: Result<Vec<(String, isize)>, RedisError> = con.zrangebyscore_limit_withscores(&UNRESERVED_SET_KEY.to_string(), "0", "+inf", 0, reserve_params.n as isize);
         let mut message_list_for_move = Vec::new();
         let mut message_list_for_delete = Vec::new();
         match unreserved_msg_key_list {

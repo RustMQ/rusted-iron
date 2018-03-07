@@ -78,14 +78,10 @@ impl Queue {
         Queue::new_from_hash(queue_id.to_string(), result)
     }
 
-    pub fn get_message_counter_key(
-        queue_id: &String,
-        msg_type: &String
-    ) -> String {
+    pub fn get_message_counter_key(queue_id: &String) -> String {
         let mut key = String::new();
         let queue_key = Queue::get_queue_key(queue_id);
         key.push_str(&queue_key);
-        key.push_str(msg_type);
         key.push_str(":msg:counter");
 
         key
