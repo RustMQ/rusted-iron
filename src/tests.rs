@@ -146,3 +146,17 @@ fn delete_message_by_id() {
     assert_eq!(response.status(), Status::Ok);
     assert_eq!(v, expected);
 }
+
+
+#[test]
+fn reserve_message() {
+    let rocket = super::rocket();
+    let client = Client::new(rocket).expect("valid rocket instance");
+
+    let mut response: LocalResponse = client.post("/queue/1/reservations")
+        .header(ContentType::JSON)
+        .body(r#"{"n":1}"#)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::Ok);
+}
