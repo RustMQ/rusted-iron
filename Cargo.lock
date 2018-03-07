@@ -461,7 +461,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "rusted-iron"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "objectid 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "r2d2 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
