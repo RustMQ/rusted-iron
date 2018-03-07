@@ -3,12 +3,13 @@ extern crate redis;
 use redis::*;
 use queue::Queue;
 use std::collections::{HashMap, HashSet};
+use objectid::{ObjectId};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     pub id: Option<String>,
     pub body: Option<String>,
-    pub reserved_key: Option<String>
+    pub reservation_id: Option<String>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -18,13 +19,15 @@ pub struct ReserveMessageParams {
 
 pub const UNRESERVED_MSG_KEY_PART: &'static str = ":unreserved";
 pub const RESERVED_MSG_KEY_PART: &'static str = ":reserved";
+pub const UNRESERVED_SET_KEY: &'static str = "queue:1:unreserved:msg";
+pub const RESERVED_SET_KEY: &'static str = "queue:1:reserved:msg";
 
 impl Message {
     pub fn new() -> Message {
         Message {
             id: None,
             body: None,
-            reserved_key: None
+            reservation_id: None
         }
     }
 
@@ -39,11 +42,11 @@ impl Message {
             _ => println!("Wrong key body"),
         }
 
-        match hash_map.get(&*"reserved_key") {
+        match hash_map.get(&*"reservation_id") {
             Some(v) => {
-                msg.reserved_key = Some(v.to_string());
+                msg.reservation_id = Some(v.to_string());
             },
-            _ => println!("Wrong key for reserved key field"),
+            _ => println!("Wrong key for reservation id field"),
         }
 
         msg
@@ -139,52 +142,50 @@ impl Message {
         unreserved_msg_key.push_str(&queue_key);
         unreserved_msg_key.push_str(&UNRESERVED_MSG_KEY_PART.to_string());
         unreserved_msg_key.push_str(":msg");
-        let reserved_msg_counter_key = Queue::get_message_counter_key(&queue_id, &RESERVED_MSG_KEY_PART.to_string());
+        let unreserved_msg_key_list: Result<Vec<(String, isize)>, RedisError> = con.zrangebyscore_limit_withscores(&unreserved_msg_key, "0", "+inf", 0, reserve_params.n as isize);
+        let mut message_list_for_move = Vec::new();
+        let mut message_list_for_delete = Vec::new();
+        match unreserved_msg_key_list {
+            Ok(unreserved_msg_key_list) => {
+                for msg_key in unreserved_msg_key_list {
+                  message_list_for_move.push((msg_key.1.clone(), msg_key.0.clone()));
+                  message_list_for_delete.push(msg_key.0.clone());
+                };
+            },
+            Err(err) => println!("Error: {:?}", err),
+        }
 
-        let r = redis::transaction(con, &[&reserved_msg_counter_key], |pipe| {
-            let mut score: i32 = try!(con.get(&reserved_msg_counter_key));
-            println!("Score: {:?}", score);
-            println!("MK: {:?}", unreserved_msg_key);
-
-            let resp: Vec<String> = try!(con
-                    .zrangebyscore_limit(&unreserved_msg_key, "0", "+inf", 0, reserve_params.n as isize));
-            println!("R: {:?}", resp);
-
-            let mut sm = Vec::new();
-            let mut mfd = Vec::new();
-            let mut mfr = Vec::new();
-
-            for m_k in resp {
-                println!("FOR!!!");
-                let mut m: HashMap<String,String> = try!(con.hgetall(&m_k));
-                println!("M: {:?}", m);
-                mfd.push(m_k.clone());
-                sm.push(
-                    (score, m_k)
-                );
-                let _ : () = try!(
-                    pipe.atomic().cmd("INCR")
-                        .arg(&reserved_msg_counter_key,)
-                        .query(con)
-                );
-                m.insert("reserved_key".to_string(), score.to_string());
-                mfr.push(m);
-                score = score + 1;
-            };
-            let _ : () = try!(con
-                .zadd_multiple("queue:1:reserved:msg", &sm)
-            );
-            let _: () = try!(con.zrem("queue:1:unreserved:msg", mfd));
-            // println!("SM: {:?}", sm);
-            // let resp2: Value = try!(pipe.zadd_multiple("queue:1:reserved:msg", &sm).query(con));
-            // println!("R: {:?}", resp2);
-            for mr in mfr {
-                let id: String = mr.get("id").unwrap().to_string();
-                result.push(Message::new_from_hash(id, mr));
-            }
-
-            Ok(Some(1))
+        if message_list_for_move.is_empty() {
+            return result
+        }
+        // 1. TX unreserved -> reserved
+        let _r: Vec<isize> = redis::transaction(con, &[UNRESERVED_SET_KEY.to_string(), RESERVED_SET_KEY.to_string()], |pipe| {
+            pipe
+                .atomic()
+                .zrem(UNRESERVED_SET_KEY.to_string(), message_list_for_delete.clone()).ignore()
+                .zadd_multiple(RESERVED_SET_KEY.to_string(), &message_list_for_move)
+                .query(con)
         }).unwrap();
+
+        // 2. Loop over reserved (per n in request)
+        for rm in message_list_for_delete.clone() {
+            let oid: ObjectId = ObjectId::new().unwrap();
+            let _r: Vec<isize> = redis::transaction(con, &[rm.clone()], |pipe| {
+        // 2.2. update msg --> TX (?)
+                pipe
+                    .atomic()
+                    .hset_nx(rm.clone(), "reservation_id", oid.to_string())
+                    .query(con)
+            }).unwrap();
+        };
+        // 3. collect updated msgs
+        for updated_msg_key in message_list_for_delete.clone() {
+            let mut updated_msg: Result<HashMap<String,String>, RedisError> = con.hgetall(&updated_msg_key);
+            match updated_msg {
+                Ok(msg) => result.push(Message::new_from_hash(msg["id"].clone(), msg)),
+                Err(err) => println!("Error: {:?}", err),
+            }
+        };
 
         result
     }

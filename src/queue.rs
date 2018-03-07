@@ -111,13 +111,6 @@ impl Queue {
     }
 
     pub fn reserve_messages(queue_id: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Vec<Message> {
-        let mut result = Vec::new();
-
-        for m in Message::reserve_messages(queue_id, reserve_params, con) {
-            println!("Message: {:?}", m);
-            result.push(m);
-        }
-
-        result
+        Message::reserve_messages(queue_id, reserve_params, con)
     }
 }

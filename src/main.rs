@@ -7,8 +7,7 @@ extern crate r2d2;
 extern crate r2d2_redis;
 extern crate serde;
 extern crate serde_json;
-extern crate rand;
-extern crate uuid;
+extern crate objectid;
 #[macro_use]
 extern crate rocket_contrib;
 #[macro_use]
@@ -113,11 +112,7 @@ fn reserve_messages(
     reserve_params: Json<ReserveMessageParams>,
     conn: RedisConnection
 ) -> Option<Json<Value>> {
-    println!("Reserve params: {:?}", reserve_params);
-
     let rp = reserve_params.into_inner();
-    println!("Reserve params: {:?}", rp);
-
     let results: Vec<Message> = Queue::reserve_messages(&queue_id, &rp, &*conn);
 
     return Some(Json(json!({
