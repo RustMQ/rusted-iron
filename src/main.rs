@@ -1,37 +1,64 @@
-#![feature(plugin, decl_macro)]
-#![plugin(rocket_codegen)]
+extern crate futures;
+extern crate gotham;
+extern crate hyper;
+extern crate mime;
 
-extern crate rocket;
 extern crate redis;
 extern crate r2d2;
 extern crate r2d2_redis;
 extern crate serde;
+#[macro_use]
 extern crate serde_json;
 extern crate objectid;
 #[macro_use]
-extern crate rocket_contrib;
-#[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
-mod static_files;
-mod db;
-mod queue;
-mod message;
-#[cfg(test)] mod tests;
+// mod static_files;
+// mod db;
+// mod queue;
+// mod message;
+// #[cfg(test)] mod tests;
 
-use rocket::{Rocket};
-use rocket_contrib::{Json, Value};
-use db::{pool, RedisConnection};
-use queue::{Queue};
-use message::{Message, ReserveMessageParams};
+use hyper::{Response, StatusCode};
 
-#[get("/", format = "application/json")]
-fn index() -> Json {
-    Json(json!({
-        "goto": "http://www.iron.io"
-    }))
+use gotham::router::Router;
+use gotham::router::builder::*;
+use gotham::http::response::create_response;
+use gotham::state::State;
+
+// use db::{pool, RedisConnection};
+// use queue::{Queue};
+// use message::{Message, ReserveMessageParams};
+
+
+fn router() -> Router {
+    build_simple_router(|route| {
+        route.get("/").to(index)
+    })
 }
 
+
+pub fn index(state: State) -> (State, Response) {
+    let res = {
+        let res_str = r#"{
+            "goto": "http://www.iron.io"
+        }"#;
+        create_response(
+            &state,
+            StatusCode::Ok,
+            Some((
+                res_str.to_string().into_bytes(),
+                mime::APPLICATION_JSON
+            )),
+        )
+    };
+
+    (state, res)
+}
+/*
 #[get("/version")]
 fn redis_version(conn: RedisConnection) -> Json {
     let info : redis::InfoDict = redis::cmd("INFO").query(&*(conn.0)).unwrap();
@@ -127,25 +154,13 @@ fn not_found() -> Json {
         "reason": "Resource was not found."
     }))
 }
+*/
+pub fn main() {
+    env_logger::init();
 
-fn rocket() -> Rocket {
-    let rocket = rocket::ignite()
-        .manage(pool())
-        .mount("/", routes![index, static_files::all])
-        .mount("/redis/", routes![redis_version])
-        .mount("/queue/", routes![
-            get_queue_info,
-            post_message_to_queue,
-            get_message_from_queue,
-            delete_message_from_queue,
-            reserve_messages
-        ])
-        .catch(errors![not_found]);
+    info!("starting up");
+    let addr = "0.0.0.0:8000";
+    info!("Gotham started on: {}", addr);
 
-    rocket
-}
-
-fn main() {
-    let rocket = rocket();
-    rocket.launch();
+    gotham::start(addr, router())
 }
