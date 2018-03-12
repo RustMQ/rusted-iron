@@ -86,19 +86,6 @@ impl Message {
                         .ignore()
                     .query(con);
 
-            match response {
-                Err(e) => print!("{:?}", e),
-                Ok(v) => {
-                    if v[0] == String::from("OK") {
-                        println!("New message set");
-                    }
-                    else {
-                        println!("New message not set");
-                    }
-                    println!("V: {:?}", v);
-                }
-            }
-
             Ok(Some(msg_id))
         }).unwrap();
 

@@ -1,6 +1,28 @@
+extern crate mime;
+extern crate serde_json;
+
 use std::collections::HashMap;
 use message::{Message, ReserveMessageParams};
 use redis::*;
+
+use hyper::{Body, Response, StatusCode};
+use futures::{future, Future, Stream};
+use gotham::state::{FromState, State};
+use gotham::handler::{IntoResponse, HandlerFuture, IntoHandlerError};
+use gotham::http::response::create_response;
+
+use redis_middleware::RedisMiddlewareData;
+
+#[derive(Deserialize, StateData, StaticResponseExtender)]
+pub struct QueuePathExtractor {
+    id: String,
+}
+
+#[derive(Deserialize, StateData, StaticResponseExtender)]
+pub struct MessagePathExtractor {
+    id: String,
+    queue_id: String
+}
 
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
 pub enum QueueError {
@@ -109,4 +131,54 @@ impl Queue {
     pub fn reserve_messages(queue_id: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Vec<Message> {
         Message::reserve_messages(queue_id, reserve_params, con)
     }
+}
+
+pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
+    let f = Body::take_from(&mut state)
+        .concat2()
+        .then(|full_body| match full_body {
+            Ok(valid_body) => {
+                let ids = {
+                    let path = QueuePathExtractor::borrow_from(&state);
+                    let data = RedisMiddlewareData::borrow_from(&state);
+                    let connection = &*(data.connection.0);
+                    let id = path.id.parse().unwrap();
+                    info!("ID: {}", id);
+                    let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
+                    info!("BODY: {}", body_content);
+                    let messages: Vec<Message> = serde_json::from_str(&body_content).unwrap();
+
+                    let q = Queue::get_queue(&id, connection);
+                    info!("Q: {:?}", q);
+                    let mut result = Vec::new();
+                    for x in messages {
+                        let mut m: Message = Message::new();
+                        m.body = x.body;
+                        let mid = Queue::post_message(q.clone(), m, &*connection).expect("Message put on queue.");
+                        result.push(mid.to_string());
+                    };
+
+                    result
+                };
+
+                let body = json!({
+                    "ids": ids,
+                    "msg": String::from("Messages put on queue.")
+                });
+
+                let res = create_response(
+                    &state,
+                    StatusCode::Created,
+                    Some((
+                        body.to_string().into_bytes(),
+                        mime::APPLICATION_JSON
+                    )),
+                );
+
+                future::ok((state, res))
+            },
+            Err(e) => future::err((state, e.into_handler_error()))
+        });
+
+    Box::new(f)
 }

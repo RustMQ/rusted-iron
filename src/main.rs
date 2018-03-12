@@ -12,6 +12,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_json;
 extern crate objectid;
+#[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate log;
@@ -21,8 +22,8 @@ mod redis_api;
 mod redis_middleware;
 // mod static_files;
 mod db;
-// mod queue;
-// mod message;
+mod queue;
+mod message;
 // #[cfg(test)] mod tests;
 
 use hyper::{Response, StatusCode};
@@ -34,10 +35,10 @@ use gotham::state::State;
 use gotham::pipeline::new_pipeline;
 use gotham::pipeline::single::single_pipeline;
 
-// use queue::{Queue};
 // use message::{Message, ReserveMessageParams};
 use db::{pool, Pool};
 use redis_middleware::RedisMiddleware;
+use queue::QueuePathExtractor;
 
 
 fn router(pool: Pool) -> Router {
@@ -52,7 +53,14 @@ fn router(pool: Pool) -> Router {
 
         route.scope("/redis", |route| {
             route.get("/version").to(redis_api::version);
-        })
+        });
+
+        route.scope("/queue/:id", |route| {
+            route
+                .post("/messages")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(queue::push_messages);
+        });
     })
 }
 
@@ -75,15 +83,6 @@ pub fn index(state: State) -> (State, Response) {
     (state, res)
 }
 /*
-#[get("/version")]
-fn redis_version(conn: RedisConnection) -> Json {
-    let info : redis::InfoDict = redis::cmd("INFO").query(&*(conn.0)).unwrap();
-    let redis_version: String = info.get("redis_version").unwrap();
-
-    Json(json!({
-        "redis_version": redis_version
-    }))
-}
 
 #[get("/<queue_id>", format = "application/json")]
 fn get_queue_info(queue_id: String, _conn: RedisConnection) -> Json<Value> {
