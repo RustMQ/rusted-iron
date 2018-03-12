@@ -1,5 +1,7 @@
 extern crate futures;
 extern crate gotham;
+#[macro_use]
+extern crate gotham_derive;
 extern crate hyper;
 extern crate mime;
 
@@ -10,14 +12,15 @@ extern crate serde;
 #[macro_use]
 extern crate serde_json;
 extern crate objectid;
-#[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
 
+mod redis_api;
+mod redis_middleware;
 // mod static_files;
-// mod db;
+mod db;
 // mod queue;
 // mod message;
 // #[cfg(test)] mod tests;
@@ -28,15 +31,28 @@ use gotham::router::Router;
 use gotham::router::builder::*;
 use gotham::http::response::create_response;
 use gotham::state::State;
+use gotham::pipeline::new_pipeline;
+use gotham::pipeline::single::single_pipeline;
 
-// use db::{pool, RedisConnection};
 // use queue::{Queue};
 // use message::{Message, ReserveMessageParams};
+use db::{pool, Pool};
+use redis_middleware::RedisMiddleware;
 
 
-fn router() -> Router {
-    build_simple_router(|route| {
-        route.get("/").to(index)
+fn router(pool: Pool) -> Router {
+    let redis_middleware = RedisMiddleware::new(pool);
+
+    let (chain, pipelines) = single_pipeline(
+        new_pipeline().add(redis_middleware).build()
+    );
+
+    build_router(chain, pipelines, |route| {
+        route.get("/").to(index);
+
+        route.scope("/redis", |route| {
+            route.get("/version").to(redis_api::version);
+        })
     })
 }
 
@@ -159,8 +175,8 @@ pub fn main() {
     env_logger::init();
 
     info!("starting up");
+    let pool = pool();
     let addr = "0.0.0.0:8000";
     info!("Gotham started on: {}", addr);
-
-    gotham::start(addr, router())
+    gotham::start(addr, router(pool))
 }
