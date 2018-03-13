@@ -143,13 +143,10 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                     let data = RedisMiddlewareData::borrow_from(&state);
                     let connection = &*(data.connection.0);
                     let id = path.id.parse().unwrap();
-                    info!("ID: {}", id);
                     let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
-                    info!("BODY: {}", body_content);
                     let messages: Vec<Message> = serde_json::from_str(&body_content).unwrap();
 
                     let q = Queue::get_queue(&id, connection);
-                    info!("Q: {:?}", q);
                     let mut result = Vec::new();
                     for x in messages {
                         let mut m: Message = Message::new();
@@ -194,9 +191,7 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
                     let data = RedisMiddlewareData::borrow_from(&state);
                     let connection = &*(data.connection.0);
                     let id: String = path.id.parse().unwrap();
-                    info!("ID: {}", id);
                     let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
-                    info!("BODY: {}", body_content);
                     let reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
 
                     Message::reserve_messages(&id, &reserve_params, connection)
