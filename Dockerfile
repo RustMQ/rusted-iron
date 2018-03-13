@@ -1,4 +1,4 @@
-FROM rustlang/rust:nightly as build
+FROM rust:latest as build
 
 WORKDIR /usr/src/rusted-iron
 
@@ -21,4 +21,4 @@ WORKDIR /app
 COPY --from=build /usr/src/rusted-iron/target/release/rusted-iron .
 COPY --from=build /usr/src/rusted-iron/static static
 
-CMD [ "/bin/bash", "-c", "env && ls -al && ROCKET_PORT=${PORT} ROCKET_ENV=${ROCKET_ENV} ./rusted-iron" ]
+CMD [ "/bin/bash", "-c", "env && ls -al && ./rusted-iron" ]
