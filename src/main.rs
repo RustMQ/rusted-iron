@@ -60,6 +60,10 @@ fn router(pool: Pool) -> Router {
                 .post("/messages")
                 .with_path_extractor::<QueuePathExtractor>()
                 .to(queue::push_messages);
+            route
+                .post("/reservations")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(queue::reserve_messages);
         });
     })
 }

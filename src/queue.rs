@@ -182,3 +182,43 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
 
     Box::new(f)
 }
+
+pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
+    let f = Body::take_from(&mut state)
+        .concat2()
+        .then(|full_body| match full_body {
+            Ok(valid_body) => {
+
+                let messages: Vec<Message> = {
+                    let path = QueuePathExtractor::borrow_from(&state);
+                    let data = RedisMiddlewareData::borrow_from(&state);
+                    let connection = &*(data.connection.0);
+                    let id: String = path.id.parse().unwrap();
+                    info!("ID: {}", id);
+                    let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
+                    info!("BODY: {}", body_content);
+                    let reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
+
+                    Message::reserve_messages(&id, &reserve_params, connection)
+                };
+
+                let body = json!({
+                    "messages": messages
+                });
+
+                let res = create_response(
+                    &state,
+                    StatusCode::Ok,
+                    Some((
+                        body.to_string().into_bytes(),
+                        mime::APPLICATION_JSON
+                    )),
+                );
+
+                future::ok((state, res))
+            },
+            Err(e) => future::err((state, e.into_handler_error()))
+        });
+
+    Box::new(f)
+}
