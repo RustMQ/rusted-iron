@@ -26,6 +26,8 @@ mod queue;
 mod message;
 // #[cfg(test)] mod tests;
 
+use std::env;
+
 use hyper::{Response, StatusCode};
 
 use gotham::router::Router;
@@ -179,7 +181,10 @@ pub fn main() {
 
     info!("starting up");
     let pool = pool();
-    let addr = "0.0.0.0:8000";
+    let port: String = env::var("PORT").expect("$PORT is provided");
+    info!("PORT: {:?}", port);
+
+    let addr = format!("0.0.0.0:{}", port);
     info!("Gotham started on: {}", addr);
     gotham::start(addr, router(pool))
 }
