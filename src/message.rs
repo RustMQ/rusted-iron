@@ -51,7 +51,6 @@ impl Message {
     }
 
     pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
-        println!("Message: {:?}", message);
         let queue_id: String = queue.id.expect("Queue ID");
         let queue_key: String = Queue::get_queue_key(&queue_id);
         let msg_counter_key = Queue::get_message_counter_key(&queue_id);
