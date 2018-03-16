@@ -11,6 +11,10 @@ use gotham::state::{FromState, State};
 use gotham::handler::{IntoResponse, HandlerFuture, IntoHandlerError};
 use gotham::http::response::create_response;
 
+use std::sync::Arc;
+use std::sync::Mutex;
+use rayon::prelude::*;
+
 use redis_middleware2::RedisPool;
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
@@ -152,13 +156,17 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                     let messages: Vec<Message> = serde_json::from_str(&body_content).unwrap();
 
                     let q = Queue::get_queue(&id, &connection);
-                    let mut result = Vec::new();
-                    for x in messages {
-                        let mut m: Message = Message::new();
-                        m.body = x.body;
-                        let mid = Queue::post_message(q.clone(), m, &connection).expect("Message put on queue.");
-                        result.push(mid.to_string());
-                    };
+                    let shared_connection = Arc::new(Mutex::new(connection));
+                    let mut result: Vec<String> = messages
+                        .into_par_iter()
+                        .map(|msg| {
+                            let shared_connection = shared_connection.clone();
+                            let c = shared_connection.lock().unwrap();
+                            let mut m: Message = Message::new();
+                            m.body = msg.body;
+                            let mid = Queue::post_message(q.clone(), m, &c).expect("Message put on queue.");
+                            mid.to_string()
+                        }).collect();
 
                     result
                 };
