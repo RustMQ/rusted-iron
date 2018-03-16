@@ -5,10 +5,10 @@ use std::collections::HashMap;
 use message::{Message, ReserveMessageParams};
 use redis::*;
 
-use hyper::{Body, Response, StatusCode};
+use hyper::{Body, StatusCode};
 use futures::{future, Future, Stream};
 use gotham::state::{FromState, State};
-use gotham::handler::{IntoResponse, HandlerFuture, IntoHandlerError};
+use gotham::handler::{HandlerFuture, IntoHandlerError};
 use gotham::http::response::create_response;
 
 use std::sync::Arc;
@@ -19,7 +19,7 @@ use redis_middleware2::RedisPool;
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueuePathExtractor {
-    id: String,
+    name: String,
 }
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
@@ -35,7 +35,6 @@ pub enum QueueError {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Queue {
-    pub id: Option<String>,
     pub name: Option<String>,
     pub class: Option<String>,
     pub totalrecv: Option<i32>,
@@ -47,7 +46,6 @@ pub const DEFAULT_QUEUE_KEY: &'static str = "queue:";
 impl Queue {
     fn new() -> Queue {
         Queue {
-            id: None,
             class: None,
             name: None,
             totalrecv: None,
@@ -63,16 +61,10 @@ impl Queue {
         key
     }
 
-    fn new_from_hash(queue_id: String, hash_map: HashMap<String, String>) -> Queue {
+    fn new_from_hash(queue_name: String, hash_map: HashMap<String, String>) -> Queue {
         let mut queue = Queue::new();
-        queue.id = Some(queue_id);
+        queue.name = Some(queue_name);
 
-        match hash_map.get(&*"name") {
-            Some(v) => {
-                queue.name = Some(v.to_string());
-            },
-            _ => println!("Wrong key name"),
-        }
         match hash_map.get(&*"class") {
             Some(v) => {
                 queue.class = Some(v.to_string());
@@ -95,13 +87,11 @@ impl Queue {
         queue
     }
 
-    pub fn get_queue(queue_id: &String, con: &Connection) -> Queue {
-        let mut q = Queue::new();
-        q.id = Some(queue_id.to_string());
-        let queue_key = Queue::get_queue_key(queue_id);
+    pub fn get_queue(queue_name: &String, con: &Connection) -> Queue {
+        let queue_key = Queue::get_queue_key(queue_name);
         let result: HashMap<String, String> = cmd("HGETALL").arg(queue_key).query(con).unwrap();
 
-        Queue::new_from_hash(queue_id.to_string(), result)
+        Queue::new_from_hash(queue_name.to_string(), result)
     }
 
     pub fn get_message_counter_key(queue_id: &String) -> String {
@@ -115,7 +105,6 @@ impl Queue {
 
     pub fn post_message(queue: Queue, message: Message, con: &Connection) -> Result<i32, QueueError> {
         let q = Queue {
-            id: queue.id,
             class: queue.class,
             name: queue.name,
             totalrecv: queue.totalrecv,
@@ -135,6 +124,70 @@ impl Queue {
     pub fn reserve_messages(queue_id: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Vec<Message> {
         Message::reserve_messages(queue_id, reserve_params, con)
     }
+
+    pub fn create_queue(queue_name: String, con: &Connection) -> Queue {
+        let mut queue_key = String::new();
+        queue_key.push_str("queue:");
+        queue_key.push_str(&queue_name);
+        let r: String = cmd("HMSET").arg(&queue_key)
+            .arg("name".to_string())
+            .arg(&queue_name)
+            .arg("class".to_string())
+            .arg("pull".to_string())
+            .arg("totalrecv".to_string())
+            .arg(0)
+            .arg("totalsent".to_string())
+            .arg(0)
+            .query(con)
+            .unwrap();
+
+        queue_key.push_str(":msg:counter");
+        let r2: String = cmd("SET").arg(queue_key).arg(0).query(con).unwrap();
+
+        Queue {
+            name: Some(queue_name),
+            class: Some("pull".to_string()),
+            totalrecv: Some(0),
+            totalsent: Some(0)
+        }
+    }
+}
+
+pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
+    let f = Body::take_from(&mut state)
+        .concat2()
+        .then(|full_body| match full_body {
+            Ok(valid_body) => {
+                let connection = {
+                    let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                    let connection = redis_pool.conn().unwrap();
+                    connection
+                };
+                let name: String = {
+                    let path = QueuePathExtractor::borrow_from(&state);
+                    path.name.clone()
+                };
+                let queue = Queue::create_queue(name, &connection);
+
+                let body = json!({
+                    "queue": queue
+                });
+
+                let res = create_response(
+                    &state,
+                    StatusCode::Ok,
+                    Some((
+                        body.to_string().into_bytes(),
+                        mime::APPLICATION_JSON
+                    )),
+                );
+
+                future::ok((state, res))
+            },
+            Err(e) => future::err((state, e.into_handler_error()))
+        });
+
+        Box::new(f)
 }
 
 pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
@@ -148,14 +201,14 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                         let connection = redis_pool.conn().unwrap();
                         connection
                     };
-                    let id: String = {
+                    let name: String = {
                         let path = QueuePathExtractor::borrow_from(&state);
-                        path.id.parse().unwrap()
+                        path.name.clone()
                     };
                     let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
                     let messages: Vec<Message> = serde_json::from_str(&body_content).unwrap();
 
-                    let q = Queue::get_queue(&id, &connection);
+                    let q = Queue::get_queue(&name, &connection);
                     let shared_connection = Arc::new(Mutex::new(connection));
                     let mut result: Vec<String> = messages
                         .into_par_iter()
@@ -205,14 +258,15 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
                         let connection = redis_pool.conn().unwrap();
                         connection
                     };
-                    let id: String = {
+                    let name: String = {
                         let path = QueuePathExtractor::borrow_from(&state);
-                        path.id.parse().unwrap()
+                        path.name.clone()
                     };
+
                     let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
                     let reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
 
-                    Message::reserve_messages(&id, &reserve_params, &connection)
+                    Message::reserve_messages(&name, &reserve_params, &connection)
                 };
 
                 let body = json!({
