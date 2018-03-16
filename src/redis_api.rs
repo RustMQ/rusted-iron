@@ -6,13 +6,16 @@ use redis::{InfoDict};
 use hyper::{Response, StatusCode};
 use gotham::state::{FromState, State};
 use gotham::http::response::create_response;
-use redis_middleware::RedisMiddlewareData;
+use redis_middleware2::RedisPool;
 
 pub fn version(mut state: State) -> (State, Response) {
     let rv = {
-        let data = RedisMiddlewareData::borrow_mut_from(&mut state);
-        let connection = &*(data.connection.0);
-        let info : InfoDict = redis::cmd("INFO").query(connection).unwrap();
+        let connection = {
+            let redis_pool = RedisPool::borrow_mut_from(&mut state);
+            let connection = redis_pool.conn().unwrap();
+            connection
+        };
+        let info : InfoDict = redis::cmd("INFO").query(&*connection).unwrap();
         let redis_version: String = info.get("redis_version").unwrap();
         redis_version
     };

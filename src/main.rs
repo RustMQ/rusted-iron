@@ -20,6 +20,7 @@ extern crate env_logger;
 
 mod redis_api;
 mod redis_middleware;
+mod redis_middleware2;
 // mod static_files;
 mod db;
 mod queue;
@@ -39,12 +40,13 @@ use gotham::pipeline::single::single_pipeline;
 
 // use message::{Message, ReserveMessageParams};
 use db::{pool, Pool};
-use redis_middleware::RedisMiddleware;
+// use redis_middleware::RedisMiddleware;
+use redis_middleware2::RedisMiddleware;
 use queue::QueuePathExtractor;
 
 
 fn router(pool: Pool) -> Router {
-    let redis_middleware = RedisMiddleware::new(pool);
+    let redis_middleware = RedisMiddleware::with_pool(pool);
 
     let (chain, pipelines) = single_pipeline(
         new_pipeline().add(redis_middleware).build()

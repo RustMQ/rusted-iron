@@ -11,7 +11,7 @@ use gotham::state::{FromState, State};
 use gotham::handler::{IntoResponse, HandlerFuture, IntoHandlerError};
 use gotham::http::response::create_response;
 
-use redis_middleware::RedisMiddlewareData;
+use redis_middleware2::RedisPool;
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueuePathExtractor {
@@ -139,19 +139,24 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
         .then(|full_body| match full_body {
             Ok(valid_body) => {
                 let ids = {
-                    let path = QueuePathExtractor::borrow_from(&state);
-                    let data = RedisMiddlewareData::borrow_from(&state);
-                    let connection = &*(data.connection.0);
-                    let id = path.id.parse().unwrap();
+                    let connection = {
+                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                        let connection = redis_pool.conn().unwrap();
+                        connection
+                    };
+                    let id: String = {
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        path.id.parse().unwrap()
+                    };
                     let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
                     let messages: Vec<Message> = serde_json::from_str(&body_content).unwrap();
 
-                    let q = Queue::get_queue(&id, connection);
+                    let q = Queue::get_queue(&id, &connection);
                     let mut result = Vec::new();
                     for x in messages {
                         let mut m: Message = Message::new();
                         m.body = x.body;
-                        let mid = Queue::post_message(q.clone(), m, &*connection).expect("Message put on queue.");
+                        let mid = Queue::post_message(q.clone(), m, &connection).expect("Message put on queue.");
                         result.push(mid.to_string());
                     };
 
@@ -187,14 +192,19 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
             Ok(valid_body) => {
 
                 let messages: Vec<Message> = {
-                    let path = QueuePathExtractor::borrow_from(&state);
-                    let data = RedisMiddlewareData::borrow_from(&state);
-                    let connection = &*(data.connection.0);
-                    let id: String = path.id.parse().unwrap();
+                    let connection = {
+                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                        let connection = redis_pool.conn().unwrap();
+                        connection
+                    };
+                    let id: String = {
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        path.id.parse().unwrap()
+                    };
                     let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
                     let reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
 
-                    Message::reserve_messages(&id, &reserve_params, connection)
+                    Message::reserve_messages(&id, &reserve_params, &connection)
                 };
 
                 let body = json!({
