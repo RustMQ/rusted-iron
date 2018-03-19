@@ -17,6 +17,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate rayon;
 
 mod redis_api;
 mod redis_middleware;
@@ -39,12 +40,13 @@ use gotham::pipeline::single::single_pipeline;
 
 // use message::{Message, ReserveMessageParams};
 use db::{pool, Pool};
+
 use redis_middleware::RedisMiddleware;
 use queue::QueuePathExtractor;
 
 
 fn router(pool: Pool) -> Router {
-    let redis_middleware = RedisMiddleware::new(pool);
+    let redis_middleware = RedisMiddleware::with_pool(pool);
 
     let (chain, pipelines) = single_pipeline(
         new_pipeline().add(redis_middleware).build()
@@ -57,7 +59,10 @@ fn router(pool: Pool) -> Router {
             route.get("/version").to(redis_api::version);
         });
 
-        route.scope("/queue/:id", |route| {
+        route.scope("/queue/:name", |route| {
+            route.put("")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(queue::put_queue);
             route
                 .post("/messages")
                 .with_path_extractor::<QueuePathExtractor>()
