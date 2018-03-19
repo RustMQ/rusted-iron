@@ -1,6 +1,6 @@
 [package]
 name = "rusted-iron"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
 
 [dependencies]
