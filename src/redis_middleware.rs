@@ -1,55 +1,99 @@
 extern crate futures;
+extern crate gotham;
 
+extern crate redis;
+extern crate r2d2;
+extern crate r2d2_redis;
+
+use std::io;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::process;
+
 use futures::{future, Future};
 
-use gotham::middleware::{Middleware};
-use gotham::state::State;
+use gotham::middleware::{Middleware, NewMiddleware};
+use gotham::state::{request_id, State};
 use gotham::handler::HandlerFuture;
 
-use db::{Pool, RedisConnection};
+use r2d2_redis::RedisConnectionManager;
 
 #[derive(StateData)]
-pub struct RedisMiddlewareData {
-    pub connection: RedisConnection
+pub struct RedisPool {
+    pub pool: r2d2::Pool<RedisConnectionManager>,
 }
 
-#[derive(NewMiddleware)]
+impl RedisPool {
+
+    pub fn new(pool: r2d2::Pool<RedisConnectionManager>) -> Self {
+        RedisPool { pool }
+    }
+
+    pub fn conn(&self) -> Result<r2d2::PooledConnection<RedisConnectionManager>, r2d2::Error> {
+        self.pool.get()
+    }
+}
+
 pub struct RedisMiddleware {
-    pool: AssertUnwindSafe<Pool>
+    pool: AssertUnwindSafe<r2d2::Pool<RedisConnectionManager>>,
 }
 
-impl RedisMiddleware {
-    pub fn new(pool: Pool) -> Self {
+pub struct RedisMiddlewareImpl {
+    pool: r2d2::Pool<RedisConnectionManager>,
+}
+
+impl RedisMiddleware
+{
+    pub fn new(database_url: &str) -> Self {
+        let manager = RedisConnectionManager::new(database_url).unwrap();
+        let pool = r2d2::Pool::builder()
+            .build(manager)
+            .unwrap();
+
+        RedisMiddleware::with_pool(pool)
+    }
+
+    pub fn with_pool(pool: r2d2::Pool<RedisConnectionManager>) -> Self {
         RedisMiddleware {
-            pool: AssertUnwindSafe(pool)
+            pool: AssertUnwindSafe(pool),
         }
     }
 }
 
-impl Middleware for RedisMiddleware {
+impl Middleware for RedisMiddlewareImpl {
     fn call<Chain>(self, mut state: State, chain: Chain) -> Box<HandlerFuture>
     where
         Chain: FnOnce(State) -> Box<HandlerFuture>,
     {
-        let c = {
-            let p = self.pool;
-            p.get().unwrap()
-        };
-        let rc = RedisConnection(c);
+        trace!("[{}] pre chain", request_id(&state));
+        state.put(RedisPool::new(self.pool));
 
-        state.put(RedisMiddlewareData {
-            connection: rc
-        });
-
-        let result = chain(state);
-
-        let f = result.and_then(move |(state, mut response)| {
+        let f = chain(state).and_then(move |(state, response)| {
+            {
+                trace!("[{}] post chain", request_id(&state));
+            }
             future::ok((state, response))
         });
-
         Box::new(f)
+    }
+}
+
+impl NewMiddleware for RedisMiddleware {
+
+    type Instance = RedisMiddlewareImpl;
+
+    fn new_middleware(&self) -> io::Result<Self::Instance> {
+        match catch_unwind(|| self.pool.clone()) {
+            Ok(pool) => Ok(RedisMiddlewareImpl { pool }),
+            Err(_) => {
+                error!(
+                    "PANIC: r2d2::Pool::clone caused a panic, unable to rescue with a HTTP error"
+                );
+                eprintln!(
+                    "PANIC: r2d2::Pool::clone caused a panic, unable to rescue with a HTTP error"
+                );
+                process::abort()
+            }
+        }
     }
 }
 

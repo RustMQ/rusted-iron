@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use rayon::prelude::*;
 
-use redis_middleware2::RedisPool;
+use redis_middleware::RedisPool;
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueuePathExtractor {

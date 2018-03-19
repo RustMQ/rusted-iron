@@ -6,7 +6,7 @@ use redis::{InfoDict};
 use hyper::{Response, StatusCode};
 use gotham::state::{FromState, State};
 use gotham::http::response::create_response;
-use redis_middleware2::RedisPool;
+use redis_middleware::RedisPool;
 
 pub fn version(mut state: State) -> (State, Response) {
     let rv = {
