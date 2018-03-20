@@ -209,15 +209,12 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                     let messages: Vec<Message> = serde_json::from_str(&body_content).unwrap();
 
                     let q = Queue::get_queue(&name, &connection);
-                    let shared_connection = Arc::new(Mutex::new(connection));
                     let mut result: Vec<String> = messages
-                        .into_par_iter()
+                        .into_iter()
                         .map(|msg| {
-                            let shared_connection = shared_connection.clone();
-                            let c = shared_connection.lock().unwrap();
                             let mut m: Message = Message::new();
                             m.body = msg.body;
-                            let mid = Queue::post_message(q.clone(), m, &c).expect("Message put on queue.");
+                            let mid = Queue::post_message(q.clone(), m, &*connection).expect("Message put on queue.");
                             mid.to_string()
                         }).collect();
 
