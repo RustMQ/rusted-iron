@@ -129,7 +129,9 @@ impl Queue {
         let mut queue_key = String::new();
         queue_key.push_str("queue:");
         queue_key.push_str(&queue_name);
-        let r: String = cmd("HMSET").arg(&queue_key)
+        let mut pipe = pipe();
+        pipe.cmd("SADD").arg("queues".to_string()).arg(&queue_name).ignore();
+        pipe.cmd("HMSET").arg(&queue_key)
             .arg("name".to_string())
             .arg(&queue_name)
             .arg("class".to_string())
@@ -137,12 +139,9 @@ impl Queue {
             .arg("totalrecv".to_string())
             .arg(0)
             .arg("totalsent".to_string())
-            .arg(0)
-            .query(con)
-            .unwrap();
-
+            .arg(0).ignore();
         queue_key.push_str(":msg:counter");
-        let r2: String = cmd("SET").arg(queue_key).arg(0).query(con).unwrap();
+        let _: Vec<String> = pipe.cmd("SET").arg(queue_key).arg(0).query(con).unwrap();
 
         Queue {
             name: Some(queue_name),
@@ -285,4 +284,23 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
         });
 
     Box::new(f)
+}
+
+pub fn list_queues(mut state: State) -> Box<HandlerFuture> {
+        let f = Body::take_from(&mut state)
+        .concat2()
+        .then(|full_body| match full_body {
+            Ok(valid_body) => {
+                let res = create_response(
+                    &state,
+                    StatusCode::Ok,
+                    Some(("hello".to_string().into_bytes(), mime::APPLICATION_JSON))
+                );
+
+                future::ok((state, res))
+            },
+            Err(e) => future::err((state, e.into_handler_error()))
+        });
+
+        Box::new(f)
 }

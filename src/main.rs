@@ -59,7 +59,8 @@ fn router(pool: Pool) -> Router {
             route.get("/version").to(redis_api::version);
         });
 
-        route.scope("/queue/:name", |route| {
+        route.get("/queues").to(queue::list_queues);
+        route.scope("/queues/:name", |route| {
             route.put("")
                 .with_path_extractor::<QueuePathExtractor>()
                 .to(queue::put_queue);
