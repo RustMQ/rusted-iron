@@ -37,6 +37,11 @@ pub struct Queue {
     pub totalsent: Option<i32>
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct QueueLite {
+    name: String
+}
+
 pub const DEFAULT_QUEUE_KEY: &'static str = "queue:";
 
 impl Queue {
@@ -81,6 +86,18 @@ impl Queue {
         }
 
         queue
+    }
+
+    pub fn list_queues(con: &Connection) -> Vec<QueueLite> {
+        let r: Vec<String> = cmd("SMEMBERS").arg("queues".to_string()).query(con).unwrap();
+        let mut res: Vec<QueueLite> = Vec::new();
+        for queue_name in r {
+            res.push(QueueLite {
+                name: queue_name
+            })
+        }
+
+        res
     }
 
     pub fn get_queue(queue_name: &String, con: &Connection) -> Queue {
@@ -273,30 +290,19 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
     Box::new(f)
 }
 
-#[derive(Serialize, Deserialize)]
-struct QueueLite {
-    name: String
-}
-
 pub fn list_queues(mut state: State) -> Box<HandlerFuture> {
         let f = Body::take_from(&mut state)
         .concat2()
         .then(|full_body| match full_body {
             Ok(valid_body) => {
                 let connection = {
-                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
-                        let connection = redis_pool.conn().unwrap();
-                        connection
-                    };
-                let r: Vec<String> = cmd("SMEMBERS").arg("queues".to_string()).query(&*connection).unwrap();
-                let mut res: Vec<QueueLite> = Vec::new();
-                for queue_name in r {
-                    res.push(QueueLite {
-                        name: queue_name
-                    })
-                }
+                    let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                    let connection = redis_pool.conn().unwrap();
+                    connection
+                };
+
                 let body = json!({
-                    "queues": res
+                    "queues": Queue::list_queues(&connection)
                 });
 
                 let res = create_response(
