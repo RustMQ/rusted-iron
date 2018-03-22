@@ -11,10 +11,6 @@ use gotham::state::{FromState, State};
 use gotham::handler::{HandlerFuture, IntoHandlerError};
 use gotham::http::response::create_response;
 
-use std::sync::Arc;
-use std::sync::Mutex;
-use rayon::prelude::*;
-
 use redis_middleware::RedisPool;
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
@@ -111,18 +107,6 @@ impl Queue {
             totalsent: queue.totalsent
         };
         Ok(Message::push_message(q, message, con))
-    }
-
-    pub fn get_message(queue_id: &String, message_id: &String, con: &Connection) -> Result<Message, QueueError> {
-        Ok(Message::get_message(queue_id, message_id, con))
-    }
-
-    pub fn delete_message(queue_id: &String, message_id: &String, con: &Connection) -> bool {
-        Message::delete_message(queue_id, message_id, con)
-    }
-
-    pub fn reserve_messages(queue_id: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Vec<Message> {
-        Message::reserve_messages(queue_id, reserve_params, con)
     }
 
     pub fn create_queue(queue_name: String, con: &Connection) -> Queue {
@@ -260,7 +244,10 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
-                    let reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
+                    let mut reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
+                    if reserve_params.delete.is_none() {
+                        reserve_params.delete = Some(false)
+                    }
 
                     Message::reserve_messages(&name, &reserve_params, &connection)
                 };
