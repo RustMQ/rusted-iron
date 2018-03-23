@@ -11,10 +11,6 @@ use gotham::state::{FromState, State};
 use gotham::handler::{HandlerFuture, IntoHandlerError};
 use gotham::http::response::create_response;
 
-use std::sync::Arc;
-use std::sync::Mutex;
-use rayon::prelude::*;
-
 use redis_middleware::RedisPool;
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
@@ -39,6 +35,11 @@ pub struct Queue {
     pub class: Option<String>,
     pub totalrecv: Option<i32>,
     pub totalsent: Option<i32>
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct QueueLite {
+    name: String
 }
 
 pub const DEFAULT_QUEUE_KEY: &'static str = "queue:";
@@ -87,6 +88,18 @@ impl Queue {
         queue
     }
 
+    pub fn list_queues(con: &Connection) -> Vec<QueueLite> {
+        let r: Vec<String> = cmd("SMEMBERS").arg("queues".to_string()).query(con).unwrap();
+        let mut res: Vec<QueueLite> = Vec::new();
+        for queue_name in r {
+            res.push(QueueLite {
+                name: queue_name
+            })
+        }
+
+        res
+    }
+
     pub fn get_queue(queue_name: &String, con: &Connection) -> Queue {
         let queue_key = Queue::get_queue_key(queue_name);
         let result: HashMap<String, String> = cmd("HGETALL").arg(queue_key).query(con).unwrap();
@@ -111,18 +124,6 @@ impl Queue {
             totalsent: queue.totalsent
         };
         Ok(Message::push_message(q, message, con))
-    }
-
-    pub fn get_message(queue_id: &String, message_id: &String, con: &Connection) -> Result<Message, QueueError> {
-        Ok(Message::get_message(queue_id, message_id, con))
-    }
-
-    pub fn delete_message(queue_id: &String, message_id: &String, con: &Connection) -> bool {
-        Message::delete_message(queue_id, message_id, con)
-    }
-
-    pub fn reserve_messages(queue_id: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Vec<Message> {
-        Message::reserve_messages(queue_id, reserve_params, con)
     }
 
     pub fn create_queue(queue_name: String, con: &Connection) -> Queue {
@@ -260,7 +261,10 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
-                    let reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
+                    let mut reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
+                    if reserve_params.delete.is_none() {
+                        reserve_params.delete = Some(false)
+                    }
 
                     Message::reserve_messages(&name, &reserve_params, &connection)
                 };
@@ -286,30 +290,19 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
     Box::new(f)
 }
 
-#[derive(Serialize, Deserialize)]
-struct QueueLite {
-    name: String
-}
-
 pub fn list_queues(mut state: State) -> Box<HandlerFuture> {
         let f = Body::take_from(&mut state)
         .concat2()
         .then(|full_body| match full_body {
             Ok(valid_body) => {
                 let connection = {
-                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
-                        let connection = redis_pool.conn().unwrap();
-                        connection
-                    };
-                let r: Vec<String> = cmd("SMEMBERS").arg("queues".to_string()).query(&*connection).unwrap();
-                let mut res: Vec<QueueLite> = Vec::new();
-                for queue_name in r {
-                    res.push(QueueLite {
-                        name: queue_name
-                    })
-                }
+                    let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                    let connection = redis_pool.conn().unwrap();
+                    connection
+                };
+
                 let body = json!({
-                    "queues": res
+                    "queues": Queue::list_queues(&connection)
                 });
 
                 let res = create_response(
