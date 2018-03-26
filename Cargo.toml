@@ -1,7 +1,8 @@
 [package]
 name = "rusted-iron"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
+publish = false
 
 [dependencies]
 gotham = "0.2.0"
@@ -13,9 +14,9 @@ serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 objectid = { version = "^0.2", features = ["serde"] }
-hyper = "0.11.22"
-futures = "0.1.18"
-tokio = "0.1.3"
+hyper = "0.11"
+futures = "0.1"
+tokio = "0.1"
 log = "0.4.1"
 env_logger = "0.5.5"
 mime = "0.3.5"
