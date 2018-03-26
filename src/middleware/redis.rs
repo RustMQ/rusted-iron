@@ -43,15 +43,6 @@ pub struct RedisMiddlewareImpl {
 
 impl RedisMiddleware
 {
-    pub fn new(database_url: &str) -> Self {
-        let manager = RedisConnectionManager::new(database_url).unwrap();
-        let pool = r2d2::Pool::builder()
-            .build(manager)
-            .unwrap();
-
-        RedisMiddleware::with_pool(pool)
-    }
-
     pub fn with_pool(pool: r2d2::Pool<RedisConnectionManager>) -> Self {
         RedisMiddleware {
             pool: AssertUnwindSafe(pool),
