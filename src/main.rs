@@ -72,6 +72,10 @@ fn router(pool: Pool) -> Router {
             route.delete("/messages/:message_id")
                 .with_path_extractor::<MessagePathExtractor>()
                 .to(api::message::delete);
+            route.delete("/messages")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(api::message::delete_messages);
+
         });
     })
 }
