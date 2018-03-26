@@ -14,7 +14,7 @@ use mq::message::{Message, ReserveMessageParams};
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueuePathExtractor {
-    name: String,
+    pub name: String,
 }
 
 pub fn put_queue(mut state: State) -> Box<HandlerFuture> {

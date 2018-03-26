@@ -1,5 +1,6 @@
 extern crate redis;
 
+use api::message::MessageDeleteBodyRequest;
 use redis::*;
 use mq::queue::Queue;
 use std::collections::{HashMap};
@@ -205,5 +206,25 @@ impl Message {
         }
 
         result
+    }
+
+    pub fn delete(queue_name: String, message_id: String, con: &Connection) -> bool {
+        let m = Message {
+            id: Some(message_id),
+            body: None,
+            reservation_id: None
+        };
+
+        Message::delete_message(&queue_name, &m, con)
+    }
+
+    pub fn delete_messages(queue_name: String, messages: &Vec<MessageDeleteBodyRequest>, con: &Connection) -> Vec<bool> {
+        let mut res = Vec::new();
+
+        for m in messages {
+            res.push(Message::delete(queue_name.to_string(), m.id.to_owned(), con));
+        }
+
+        res
     }
 }

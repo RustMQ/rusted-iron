@@ -35,6 +35,7 @@ use pool::*;
 use middleware::redis::RedisMiddleware;
 
 use api::queue::QueuePathExtractor;
+use api::message::MessagePathExtractor;
 
 fn router(pool: Pool) -> Router {
     let redis_middleware = RedisMiddleware::with_pool(pool);
@@ -67,6 +68,14 @@ fn router(pool: Pool) -> Router {
             route.delete("")
                 .with_path_extractor::<QueuePathExtractor>()
                 .to(api::queue::delete_queue);
+
+            route.delete("/messages/:message_id")
+                .with_path_extractor::<MessagePathExtractor>()
+                .to(api::message::delete);
+            route.delete("/messages")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(api::message::delete_messages);
+
         });
     })
 }
