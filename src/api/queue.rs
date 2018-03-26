@@ -21,7 +21,7 @@ pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
     let f = Body::take_from(&mut state)
         .concat2()
         .then(|full_body| match full_body {
-            Ok(valid_body) => {
+            Ok(_valid_body) => {
                 let connection = {
                     let redis_pool = RedisPool::borrow_mut_from(&mut state);
                     let connection = redis_pool.conn().unwrap();
@@ -158,7 +158,7 @@ pub fn list_queues(mut state: State) -> Box<HandlerFuture> {
         let f = Body::take_from(&mut state)
             .concat2()
             .then(|full_body| match full_body {
-                Ok(valid_body) => {
+                Ok(_valid_body) => {
                     let connection = {
                         let redis_pool = RedisPool::borrow_mut_from(&mut state);
                         let connection = redis_pool.conn().unwrap();
@@ -190,7 +190,7 @@ pub fn delete_queue(mut state: State) -> Box<HandlerFuture> {
         let f = Body::take_from(&mut state)
             .concat2()
             .then(|full_body| match full_body {
-                Ok(valid_body) => {
+                Ok(_valid_body) => {
                     let connection = {
                         let redis_pool = RedisPool::borrow_mut_from(&mut state);
                         let connection = redis_pool.conn().unwrap();

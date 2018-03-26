@@ -1,4 +1,3 @@
-use std::ops::Deref;
 use std::env;
 
 use r2d2;
