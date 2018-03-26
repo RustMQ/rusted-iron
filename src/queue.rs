@@ -151,6 +151,21 @@ impl Queue {
             totalsent: Some(0)
         }
     }
+
+    pub fn delete(queue_name: String, con: &Connection) -> bool {
+        let mut match_queue_key = String::new();
+        match_queue_key.push_str("queue:");
+        match_queue_key.push_str(&queue_name);
+        match_queue_key.push_str("*");
+
+        let mut iter : Iter<String> = cmd("SCAN").cursor_arg(0).arg("MATCH").arg(match_queue_key).iter(con).unwrap();
+        for key in iter {
+            info!("DK: {:?}", key);
+            let _: () = cmd("DEL").arg(key).query(con).unwrap();
+        }
+
+        true
+    }
 }
 
 pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
@@ -318,6 +333,45 @@ pub fn list_queues(mut state: State) -> Box<HandlerFuture> {
             },
             Err(e) => future::err((state, e.into_handler_error()))
         });
+
+        Box::new(f)
+}
+
+pub fn delete_queue(mut state: State) -> Box<HandlerFuture> {
+        let f = Body::take_from(&mut state)
+            .concat2()
+            .then(|full_body| match full_body {
+                Ok(valid_body) => {
+                    let connection = {
+                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                        let connection = redis_pool.conn().unwrap();
+                        connection
+                    };
+
+                    let name: String = {
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        path.name.clone()
+                    };
+
+                    Queue::delete(name, &connection);
+
+                    let body = json!({
+                        "msg": "Deleted"
+                    });
+
+                    let res = create_response(
+                        &state,
+                        StatusCode::Ok,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        ))
+                    );
+
+                    future::ok((state, res))
+                },
+                Err(e) => future::err((state, e.into_handler_error()))
+            });
 
         Box::new(f)
 }

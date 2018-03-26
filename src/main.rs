@@ -21,7 +21,6 @@ extern crate rayon;
 
 mod redis_api;
 mod redis_middleware;
-// mod static_files;
 mod db;
 mod queue;
 mod message;
@@ -60,6 +59,7 @@ fn router(pool: Pool) -> Router {
         });
 
         route.get("/queues").to(queue::list_queues);
+
         route.scope("/queues/:name", |route| {
             route.put("")
                 .with_path_extractor::<QueuePathExtractor>()
@@ -72,6 +72,9 @@ fn router(pool: Pool) -> Router {
                 .post("/reservations")
                 .with_path_extractor::<QueuePathExtractor>()
                 .to(queue::reserve_messages);
+            route.delete("")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(queue::delete_queue);
         });
     })
 }
