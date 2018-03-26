@@ -1,7 +1,8 @@
 extern crate mime;
 
-pub mod queue;
 pub mod redis;
+pub mod queue;
+pub mod message;
 
 use hyper::{Response, StatusCode};
 use gotham::state::{State};

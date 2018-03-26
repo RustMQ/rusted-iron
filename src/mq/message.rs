@@ -206,4 +206,14 @@ impl Message {
 
         result
     }
+
+    pub fn delete(queue_name: String, message_id: String, con: &Connection) -> bool {
+        let m = Message {
+            id: Some(message_id),
+            body: None,
+            reservation_id: None
+        };
+
+        Message::delete_message(&queue_name, &m, con)
+    }
 }

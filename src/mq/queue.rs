@@ -3,13 +3,6 @@ use redis::*;
 
 use mq::message::Message;
 
-
-#[derive(Deserialize, StateData, StaticResponseExtender)]
-pub struct MessagePathExtractor {
-    id: String,
-    queue_id: String
-}
-
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
 pub enum QueueError {
     CounterKeyMissing
