@@ -6,7 +6,7 @@ use r2d2_redis::RedisConnectionManager;
 
 pub type Pool = r2d2::Pool<RedisConnectionManager>;
 
-pub fn pool() -> Pool {
+pub fn new_pool() -> Pool {
     let database_url: String = env::var("REDISCLOUD_URL").expect("$REDISCLOUD_URL is provided");
     let max_size: String = env::var("REDIS_CONNECTION_MAX_SIZE").expect("$REDIS_CONNECTION_MAX_SIZE is provided");
     info!("REDISCLOUD_URL: {:?}", database_url);
@@ -17,14 +17,4 @@ pub fn pool() -> Pool {
         .max_size(max_size.parse::<u32>().unwrap())
         .build(manager)
         .expect("db pool is not created")
-}
-
-pub struct RedisConnection(pub r2d2::PooledConnection<RedisConnectionManager>);
-
-impl Deref for RedisConnection {
-    type Target = r2d2::PooledConnection<RedisConnectionManager>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
 }

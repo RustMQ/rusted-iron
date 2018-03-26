@@ -1,7 +1,7 @@
 extern crate redis;
 
 use redis::*;
-use queue::Queue;
+use mq::queue::Queue;
 use std::collections::{HashMap};
 use objectid::{ObjectId};
 
