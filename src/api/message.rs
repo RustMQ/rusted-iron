@@ -82,7 +82,6 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
                     let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
                     let messages: Vec<MessageDeleteBodyRequest> = serde_json::from_value(body_content["ids"].clone()).unwrap();
 
-                    info!("messages = {:?}", messages);
                     Message::delete_messages(queue_name, &messages, &connection);
 
                     let body = json!({
