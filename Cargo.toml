@@ -1,11 +1,12 @@
 [package]
 name = "rusted-iron"
-version = "0.0.5"
+version = "0.1.4"
 authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
+publish = false
 
 [dependencies]
-rocket = "0.3.6"
-rocket_codegen = "0.3.6"
+gotham = "0.2.0"
+gotham_derive = "0.2.0"
 redis = "0.8"
 r2d2 = "0.8"
 r2d2_redis = "0.7"
@@ -13,8 +14,10 @@ serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 objectid = { version = "^0.2", features = ["serde"] }
-
-[dependencies.rocket_contrib]
-version = "*"
-default-features = false
-features = ["json"]
+hyper = "0.11"
+futures = "0.1"
+tokio = "0.1"
+log = "0.4.1"
+env_logger = "0.5.5"
+mime = "0.3.5"
+rayon = "1.0.0"

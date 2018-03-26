@@ -1,46 +1,100 @@
-#![feature(plugin, decl_macro)]
-#![plugin(rocket_codegen)]
+extern crate futures;
+extern crate gotham;
+#[macro_use]
+extern crate gotham_derive;
+extern crate hyper;
+extern crate mime;
 
-extern crate rocket;
 extern crate redis;
 extern crate r2d2;
 extern crate r2d2_redis;
 extern crate serde;
+#[macro_use]
 extern crate serde_json;
 extern crate objectid;
 #[macro_use]
-extern crate rocket_contrib;
-#[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+extern crate rayon;
 
-mod static_files;
+mod redis_api;
+mod redis_middleware;
+// mod static_files;
 mod db;
 mod queue;
 mod message;
-#[cfg(test)] mod tests;
+// #[cfg(test)] mod tests;
 
-use rocket::{Rocket};
-use rocket_contrib::{Json, Value};
-use db::{pool, RedisConnection};
-use queue::{Queue};
-use message::{Message, ReserveMessageParams};
+use std::env;
 
-#[get("/", format = "application/json")]
-fn index() -> Json {
-    Json(json!({
-        "goto": "http://www.iron.io"
-    }))
+use hyper::{Response, StatusCode};
+
+use gotham::router::Router;
+use gotham::router::builder::*;
+use gotham::http::response::create_response;
+use gotham::state::State;
+use gotham::pipeline::new_pipeline;
+use gotham::pipeline::single::single_pipeline;
+
+// use message::{Message, ReserveMessageParams};
+use db::{pool, Pool};
+
+use redis_middleware::RedisMiddleware;
+use queue::QueuePathExtractor;
+
+
+fn router(pool: Pool) -> Router {
+    let redis_middleware = RedisMiddleware::with_pool(pool);
+
+    let (chain, pipelines) = single_pipeline(
+        new_pipeline().add(redis_middleware).build()
+    );
+
+    build_router(chain, pipelines, |route| {
+        route.get("/").to(index);
+
+        route.scope("/redis", |route| {
+            route.get("/version").to(redis_api::version);
+        });
+
+        route.get("/queues").to(queue::list_queues);
+        route.scope("/queues/:name", |route| {
+            route.put("")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(queue::put_queue);
+            route
+                .post("/messages")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(queue::push_messages);
+            route
+                .post("/reservations")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(queue::reserve_messages);
+        });
+    })
 }
 
-#[get("/version")]
-fn redis_version(conn: RedisConnection) -> Json {
-    let info : redis::InfoDict = redis::cmd("INFO").query(&*(conn.0)).unwrap();
-    let redis_version: String = info.get("redis_version").unwrap();
 
-    Json(json!({
-        "redis_version": redis_version
-    }))
+pub fn index(state: State) -> (State, Response) {
+    let res = {
+        let res_str = r#"{
+            "goto": "http://www.iron.io"
+        }"#;
+        create_response(
+            &state,
+            StatusCode::Ok,
+            Some((
+                res_str.to_string().into_bytes(),
+                mime::APPLICATION_JSON
+            )),
+        )
+    };
+
+    (state, res)
 }
+/*
 
 #[get("/<queue_id>", format = "application/json")]
 fn get_queue_info(queue_id: String, _conn: RedisConnection) -> Json<Value> {
@@ -127,25 +181,16 @@ fn not_found() -> Json {
         "reason": "Resource was not found."
     }))
 }
+*/
+pub fn main() {
+    env_logger::init();
 
-fn rocket() -> Rocket {
-    let rocket = rocket::ignite()
-        .manage(pool())
-        .mount("/", routes![index, static_files::all])
-        .mount("/redis/", routes![redis_version])
-        .mount("/queue/", routes![
-            get_queue_info,
-            post_message_to_queue,
-            get_message_from_queue,
-            delete_message_from_queue,
-            reserve_messages
-        ])
-        .catch(errors![not_found]);
+    info!("starting up");
+    let pool = pool();
+    let port: String = env::var("PORT").expect("$PORT is provided");
+    info!("PORT: {:?}", port);
 
-    rocket
-}
-
-fn main() {
-    let rocket = rocket();
-    rocket.launch();
+    let addr = format!("0.0.0.0:{}", port);
+    info!("Gotham started on: {}", addr);
+    gotham::start(addr, router(pool))
 }
