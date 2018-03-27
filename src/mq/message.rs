@@ -36,14 +36,14 @@ impl Message {
             Some(v) => {
                 msg.body = Some(v.to_string());
             },
-            _ => println!("Wrong key body"),
+            _ => msg.body = None
         }
 
         match hash_map.get(&*"reservation_id") {
             Some(v) => {
                 msg.reservation_id = Some(v.to_string());
             },
-            _ => println!("Wrong key for reservation id field"),
+            _ => msg.reservation_id = None
         }
 
         msg

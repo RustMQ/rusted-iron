@@ -105,3 +105,41 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
         Box::new(f)
 }
 
+pub fn get_message(mut state: State) -> Box<HandlerFuture> {
+        let f = Body::take_from(&mut state)
+            .concat2()
+            .then(|full_body| match full_body {
+                Ok(_valid_body) => {
+                    let connection = {
+                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                        let connection = redis_pool.conn().unwrap();
+                        connection
+                    };
+
+                    let (queue_name, message_id): (String, String) = {
+                        let path = MessagePathExtractor::borrow_from(&state);
+                        (path.name.clone(), path.message_id.clone())
+                    };
+
+                    let msg: Message = Message::get_message(&queue_name, &message_id, &connection);
+
+                    let body = json!({
+                        "message": msg
+                    });
+
+                    let res = create_response(
+                        &state,
+                        StatusCode::Ok,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        ))
+                    );
+
+                    future::ok((state, res))
+                },
+                Err(e) => future::err((state, e.into_handler_error()))
+            });
+
+        Box::new(f)
+}
