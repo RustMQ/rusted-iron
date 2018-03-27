@@ -79,6 +79,11 @@ fn router(pool: Pool) -> Router {
             route.post("/webhook")
                 .with_path_extractor::<QueuePathExtractor>()
                 .to(api::queue::push_messages_via_webhook);
+
+            route.get("/messages/:message_id")
+                .with_path_extractor::<MessagePathExtractor>()
+                .to(api::message::get_message);
+
         });
     })
 }

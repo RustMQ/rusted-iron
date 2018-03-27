@@ -49,19 +49,19 @@ impl Queue {
             Some(v) => {
                 queue.class = Some(v.to_string());
             },
-            _ => println!("Wrong key class"),
+            _ => queue.class = None
         }
         match hash_map.get(&*"totalrecv") {
             Some(v) => {
                 queue.totalrecv = Some(v.parse::<i32>().unwrap());
             },
-            _ => println!("Wrong key totalrecv"),
+            _ => queue.totalrecv = None
         }
         match hash_map.get(&*"totalsent") {
             Some(v) => {
                 queue.totalsent = Some(v.parse::<i32>().unwrap());
             },
-            _ => println!("Wrong key totalsent"),
+            _ => queue.totalsent = None
         }
 
         queue
