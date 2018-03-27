@@ -7,6 +7,8 @@ use gotham::state::{FromState, State};
 use gotham::handler::{HandlerFuture, IntoHandlerError};
 use gotham::http::response::create_response;
 
+use serde_json::Value;
+
 use middleware::redis::RedisPool;
 
 use mq::queue::Queue;
@@ -223,4 +225,46 @@ pub fn delete_queue(mut state: State) -> Box<HandlerFuture> {
             });
 
         Box::new(f)
+}
+
+pub fn push_messages_via_webhook(mut state: State) -> Box<HandlerFuture> {
+    let f = Body::take_from(&mut state)
+        .concat2()
+        .then(|full_body| match full_body {
+            Ok(valid_body) => {
+                let connection = {
+                    let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                    let connection = redis_pool.conn().unwrap();
+                    connection
+                };
+                let name: String = {
+                    let path = QueuePathExtractor::borrow_from(&state);
+                    path.name.clone()
+                };
+                let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
+                let mut message: Message = Message::new();
+                message.body = Some(body_content.to_string());
+                let q = Queue::get_queue(&name, &connection);
+                let id = Queue::post_message(q, message, &*connection).expect("Message put on queue.");
+
+                let body = json!({
+                    "id": id,
+                    "msg": String::from("Messages put on queue.")
+                });
+
+                let res = create_response(
+                    &state,
+                    StatusCode::Created,
+                    Some((
+                        body.to_string().into_bytes(),
+                        mime::APPLICATION_JSON
+                    )),
+                );
+
+                future::ok((state, res))
+            },
+            Err(e) => future::err((state, e.into_handler_error()))
+        });
+
+    Box::new(f)
 }

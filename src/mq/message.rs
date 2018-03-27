@@ -132,7 +132,6 @@ impl Message {
             .zrem(&queue_reserved_key, &[&msg_key]).ignore()
             .zrem(&queue_unreserved_key, &[&msg_key]).ignore()
             .del(&msg_key)
-            .hincr(&queue_key, "totalsent", 1).ignore()
             .query(con).unwrap();
 
         true
