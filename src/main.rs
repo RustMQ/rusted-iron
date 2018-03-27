@@ -76,6 +76,9 @@ fn router(pool: Pool) -> Router {
                 .with_path_extractor::<QueuePathExtractor>()
                 .to(api::message::delete_messages);
 
+            route.post("/webhook")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(api::queue::push_messages_via_webhook);
         });
     })
 }
