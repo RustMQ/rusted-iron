@@ -143,3 +143,51 @@ pub fn get_message(mut state: State) -> Box<HandlerFuture> {
 
         Box::new(f)
 }
+
+pub fn touch_message(mut state: State) -> Box<HandlerFuture> {
+        let f = Body::take_from(&mut state)
+            .concat2()
+            .then(|full_body| match full_body {
+                Ok(valid_body) => {
+                    let connection = {
+                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                        let connection = redis_pool.conn().unwrap();
+                        connection
+                    };
+
+                    let (queue_name, message_id): (String, String) = {
+                        let path = MessagePathExtractor::borrow_from(&state);
+                        (path.name.clone(), path.message_id.clone())
+                    };
+
+                    let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
+                    let old_reservation_id: String = serde_json::from_value(body_content["reservation_id"].clone()).unwrap();
+
+                    let reservation_id: String = Message::touch_message(&queue_name, &message_id, &old_reservation_id, &connection);
+
+                    if reservation_id.is_empty() {
+                        let res = create_response(&state, StatusCode::NotFound, None);
+                        return future::ok((state, res))
+                    }
+
+                    let body = json!({
+                        "reservation_id": reservation_id,
+                        "msg": "Touched"
+                    });
+
+                    let res = create_response(
+                        &state,
+                        StatusCode::Ok,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        ))
+                    );
+
+                    future::ok((state, res))
+                },
+                Err(e) => future::err((state, e.into_handler_error()))
+            });
+
+        Box::new(f)
+}
