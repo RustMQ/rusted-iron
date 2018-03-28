@@ -11,12 +11,17 @@ use gotham::http::response::create_response;
 use middleware::redis::RedisPool;
 
 use api::queue::QueuePathExtractor;
-use mq::message::Message;
+use mq::message::{Message, MAXIMUM_NUMBER_TO_PEEK};
 
 #[derive(Debug, Deserialize, StateData, StaticResponseExtender)]
 pub struct MessagePathExtractor {
     name: String,
     message_id: String
+}
+
+#[derive(Deserialize, StateData, StaticResponseExtender)]
+pub struct QueryStringExtractor {
+    n: Option<i32>,
 }
 
 pub fn delete(mut state: State) -> Box<HandlerFuture> {
@@ -173,6 +178,54 @@ pub fn touch_message(mut state: State) -> Box<HandlerFuture> {
                     let body = json!({
                         "reservation_id": reservation_id,
                         "msg": "Touched"
+                    });
+
+                    let res = create_response(
+                        &state,
+                        StatusCode::Ok,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        ))
+                    );
+
+                    future::ok((state, res))
+                },
+                Err(e) => future::err((state, e.into_handler_error()))
+            });
+
+        Box::new(f)
+}
+
+pub fn peek_messages(mut state: State) -> Box<HandlerFuture> {
+        let f = Body::take_from(&mut state)
+            .concat2()
+            .then(|full_body| match full_body {
+                Ok(valid_body) => {
+                    let connection = {
+                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                        let connection = redis_pool.conn().unwrap();
+                        connection
+                    };
+
+                    let queue_name: String = {
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        path.name.clone()
+                    };
+
+                    let n: i32 = {
+                        let path = QueryStringExtractor::borrow_from(&state);
+                        debug!("I'm here");
+                        match path.n {
+                            Some(n) => n,
+                            None => MAXIMUM_NUMBER_TO_PEEK,
+                        }
+                    };
+
+                    let msgs: Vec<Message> = Message::peek_messages(&queue_name, &n, &connection);
+
+                    let body = json!({
+                        "messages": msgs
                     });
 
                     let res = create_response(

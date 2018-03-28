@@ -19,6 +19,8 @@ pub struct ReserveMessageParams {
     pub delete: Option<bool>
 }
 
+pub const MAXIMUM_NUMBER_TO_PEEK: i32 = 1;
+
 impl Message {
     pub fn new() -> Message {
         Message {
@@ -249,5 +251,35 @@ impl Message {
         let _: isize = cmd("HSET").arg(msg_key).arg("reservation_id").arg(oid.to_string()).query(con).unwrap();
 
         oid.to_string()
+    }
+
+    pub fn peek_messages(queue_name: &String, number_to_peek: &i32, con: &Connection) -> Vec<Message> {
+        let mut result = Vec::new();
+
+        let mut queue_key = String::new();
+        queue_key.push_str("queue:");
+        queue_key.push_str(&queue_name);
+
+        let mut queue_unreserved_key = String::new();
+        queue_unreserved_key.push_str(&queue_key.clone());
+        queue_unreserved_key.push_str(":unreserved:msg");
+
+        let unreserved_msg_key_list: Vec<(String, isize)> = con.zrangebyscore_limit_withscores(&queue_unreserved_key, "0", "+inf", 0, *number_to_peek as isize).unwrap();
+        let mut message_key_list = Vec::new();
+        for msg_key in unreserved_msg_key_list {
+            message_key_list.push(msg_key.0.clone());
+        };
+
+
+
+        for msg_key in message_key_list {
+            let mut msg_res: Result<HashMap<String,String>, RedisError> = con.hgetall(&msg_key);
+            match msg_res {
+                Ok(map) => result.push(Message::new_from_hash(map["id"].clone(), map)),
+                Err(err) => println!("Error: {:?}", err),
+            }
+        };
+
+        result
     }
 }
