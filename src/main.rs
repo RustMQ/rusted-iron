@@ -36,6 +36,7 @@ use middleware::redis::RedisMiddleware;
 
 use api::queue::QueuePathExtractor;
 use api::message::MessagePathExtractor;
+use api::message::QueryStringExtractor;
 
 fn router(pool: Pool) -> Router {
     let redis_middleware = RedisMiddleware::with_pool(pool);
@@ -87,6 +88,11 @@ fn router(pool: Pool) -> Router {
             route.post("/messages/:message_id/touch")
                 .with_path_extractor::<MessagePathExtractor>()
                 .to(api::message::touch_message);
+
+            route.get("/messages")
+                .with_path_extractor::<QueuePathExtractor>()
+                .with_query_string_extractor::<QueryStringExtractor>()
+                .to(api::message::peek_messages);
 
         });
     })
