@@ -84,6 +84,10 @@ fn router(pool: Pool) -> Router {
                 .with_path_extractor::<MessagePathExtractor>()
                 .to(api::message::get_message);
 
+            route.post("/messages/:message_id/touch")
+                .with_path_extractor::<MessagePathExtractor>()
+                .to(api::message::touch_message);
+
         });
     })
 }

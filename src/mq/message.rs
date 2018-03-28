@@ -226,4 +226,28 @@ impl Message {
 
         res
     }
+
+    pub fn touch_message(queue_id: &String, message_id: &String, reservation_id: &String, con: &Connection) -> String {
+        let queue_key = Queue::get_queue_key(queue_id);
+        let mut msg_key = String::new();
+        msg_key.push_str(&queue_key);
+        msg_key.push_str(":msg:");
+        msg_key.push_str(&message_id.to_string());
+
+        let msg = Message::get_message(&queue_id, &message_id, con);
+
+        let current_reservation_id = match msg.reservation_id {
+            Some(reservation_id) => reservation_id,
+            None => String::new(),
+        };
+
+        if current_reservation_id != reservation_id.to_string() {
+            return String::new()
+        }
+
+        let oid: ObjectId = ObjectId::new().unwrap();
+        let _: isize = cmd("HSET").arg(msg_key).arg("reservation_id").arg(oid.to_string()).query(con).unwrap();
+
+        oid.to_string()
+    }
 }
