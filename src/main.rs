@@ -104,6 +104,10 @@ fn router(pool: Pool) -> Router {
                 .with_query_string_extractor::<QueryStringExtractor>()
                 .to(api::message::peek_messages);
 
+            route.post("/messages/:message_id/release")
+                .with_path_extractor::<MessagePathExtractor>()
+                .to(api::message::release_message);
+
         });
     })
 }
