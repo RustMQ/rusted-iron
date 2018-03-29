@@ -4,13 +4,19 @@ extern crate redis;
 
 use hyper::{Body, StatusCode};
 use futures::{future, Future, Stream};
-use gotham::state::{FromState, State};
-use gotham::handler::{HandlerFuture, IntoHandlerError};
-use gotham::http::response::create_response;
-
-use middleware::redis::RedisPool;
-
+use gotham::{
+    handler::{
+        HandlerFuture,
+        IntoHandlerError
+    },
+    http::response::create_response,
+    state::{
+        FromState,
+        State
+    }
+};
 use redis::{InfoDict};
+use middleware::redis::RedisPool;
 
 pub fn version(mut state: State) -> Box<HandlerFuture> {
     let f = Body::take_from(&mut state)

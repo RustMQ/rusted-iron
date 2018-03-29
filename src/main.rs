@@ -26,17 +26,27 @@ mod mq;
 
 use std::env;
 
-use gotham::router::Router;
-use gotham::router::builder::*;
-use gotham::pipeline::new_pipeline;
-use gotham::pipeline::single::single_pipeline;
+use gotham::{
+    router::{
+        Router,
+        builder::*
+    },
+    pipeline::{
+        new_pipeline,
+        single::single_pipeline
+    }
+};
 
 use pool::*;
 use middleware::redis::RedisMiddleware;
 
-use api::queue::QueuePathExtractor;
-use api::message::MessagePathExtractor;
-use api::message::QueryStringExtractor;
+use api::{
+    queue::QueuePathExtractor,
+    message::{
+        MessagePathExtractor,
+        QueryStringExtractor
+    }
+};
 
 fn router(pool: Pool) -> Router {
     let redis_middleware = RedisMiddleware::with_pool(pool);

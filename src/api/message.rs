@@ -4,9 +4,15 @@ extern crate serde_json;
 use serde_json::Value;
 use hyper::{Body, StatusCode};
 use futures::{future, Future, Stream};
-use gotham::state::{FromState, State};
-use gotham::handler::{HandlerFuture, IntoHandlerError};
-use gotham::http::response::create_response;
+use gotham::{
+    handler::{
+        HandlerFuture, IntoHandlerError
+    },
+    http::response::create_response,
+    state::{
+        FromState, State
+    }
+};
 
 use middleware::redis::RedisPool;
 
@@ -201,7 +207,7 @@ pub fn peek_messages(mut state: State) -> Box<HandlerFuture> {
         let f = Body::take_from(&mut state)
             .concat2()
             .then(|full_body| match full_body {
-                Ok(valid_body) => {
+                Ok(_valid_body) => {
                     let connection = {
                         let redis_pool = RedisPool::borrow_mut_from(&mut state);
                         let connection = redis_pool.conn().unwrap();

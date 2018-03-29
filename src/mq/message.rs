@@ -1,10 +1,10 @@
 extern crate redis;
 
-use api::message::MessageDeleteBodyRequest;
-use redis::*;
-use mq::queue::Queue;
 use std::collections::{HashMap};
 use objectid::{ObjectId};
+use redis::*;
+use api::message::MessageDeleteBodyRequest;
+use mq::queue::Queue;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
