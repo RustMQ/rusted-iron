@@ -5,16 +5,28 @@ extern crate redis;
 extern crate r2d2;
 extern crate r2d2_redis;
 
-use std::io;
-use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::process;
+use std::{
+    io,
+    panic::{
+        catch_unwind,
+        AssertUnwindSafe
+    },
+    process
+};
 
 use futures::{future, Future};
 
-use gotham::middleware::{Middleware, NewMiddleware};
-use gotham::state::{request_id, State};
-use gotham::handler::HandlerFuture;
-
+use gotham::{
+    handler::HandlerFuture,
+    middleware::{
+        Middleware,
+        NewMiddleware
+    },
+    state::{
+        request_id,
+        State
+    }
+};
 use r2d2_redis::RedisConnectionManager;
 
 #[derive(StateData)]

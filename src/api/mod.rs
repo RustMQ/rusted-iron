@@ -5,8 +5,12 @@ pub mod queue;
 pub mod message;
 
 use hyper::{Response, StatusCode};
-use gotham::state::{State};
-use gotham::http::response::create_response;
+use gotham::{
+    http::response::create_response,
+    state::{
+        State
+    }
+};
 
 pub fn index(state: State) -> (State, Response) {
     let res = {

@@ -3,16 +3,27 @@ extern crate serde_json;
 
 use hyper::{Body, StatusCode};
 use futures::{future, Future, Stream};
-use gotham::state::{FromState, State};
-use gotham::handler::{HandlerFuture, IntoHandlerError};
-use gotham::http::response::create_response;
-
+use gotham::{
+    handler::{
+        HandlerFuture, IntoHandlerError
+    },
+    http::response::create_response,
+    state::{
+        FromState,
+        State
+    }
+};
 use serde_json::Value;
 
 use middleware::redis::RedisPool;
 
-use mq::queue::Queue;
-use mq::message::{Message, ReserveMessageParams};
+use mq::{
+    message::{
+        Message,
+        ReserveMessageParams
+    },
+    queue::Queue
+};
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueuePathExtractor {

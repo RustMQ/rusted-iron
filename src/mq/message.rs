@@ -1,10 +1,10 @@
 extern crate redis;
 
-use api::message::MessageDeleteBodyRequest;
-use redis::*;
-use mq::queue::Queue;
 use std::collections::{HashMap};
 use objectid::{ObjectId};
+use redis::*;
+use api::message::MessageDeleteBodyRequest;
+use mq::queue::Queue;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
@@ -270,8 +270,6 @@ impl Message {
             message_key_list.push(msg_key.0.clone());
         };
 
-
-
         for msg_key in message_key_list {
             let mut msg_res: Result<HashMap<String,String>, RedisError> = con.hgetall(&msg_key);
             match msg_res {
@@ -281,5 +279,50 @@ impl Message {
         };
 
         result
+    }
+
+    pub fn release_message(queue_name: &String, message_id: &String, reservation_id: &String, con: &Connection) -> bool {
+        let mut queue_key = String::new();
+        queue_key.push_str("queue:");
+        queue_key.push_str(&queue_name);
+
+        let mut queue_unreserved_key = String::new();
+        queue_unreserved_key.push_str(&queue_key.clone());
+        queue_unreserved_key.push_str(":unreserved:msg");
+
+        let mut queue_reserved_key = String::new();
+        queue_reserved_key.push_str(&queue_key.clone());
+        queue_reserved_key.push_str(":reserved:msg");
+
+        let mut msg_key = String::new();
+        msg_key.push_str(&queue_key);
+        msg_key.push_str(":msg:");
+        msg_key.push_str(&message_id.to_string());
+
+        let msg = Message::get_message(&queue_name, &message_id, con);
+
+        let current_reservation_id = match msg.reservation_id {
+            Some(reservation_id) => reservation_id,
+            None => String::new(),
+        };
+        if current_reservation_id != reservation_id.to_string() {
+            return false
+        }
+
+        let msg_score: i32 = cmd("ZSCORE").arg(&queue_reserved_key).arg(&msg_key).query(con).unwrap();
+
+        let mut pipe = pipe();
+
+        pipe.zrem(&queue_reserved_key, &msg_key).ignore();
+        pipe.zadd(&queue_unreserved_key, &msg_key, msg_score).ignore();
+        pipe.hdel(&msg_key, "reservation_id");
+
+        let (res,): (i32,) = pipe.query(con).unwrap();
+
+        if res == 1 {
+            return true
+        } else {
+            return false
+        }
     }
 }
