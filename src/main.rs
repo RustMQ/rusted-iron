@@ -18,6 +18,7 @@ extern crate serde_derive;
 extern crate log;
 extern crate env_logger;
 extern crate rayon;
+extern crate scheduled_thread_pool;
 
 mod middleware;
 mod pool;
