@@ -1,4 +1,4 @@
-FROM rust:latest as build
+FROM rust:1.25 as build
 
 WORKDIR /usr/src/rusted-iron
 
