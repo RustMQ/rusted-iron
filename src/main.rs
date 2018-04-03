@@ -19,11 +19,13 @@ extern crate log;
 extern crate env_logger;
 extern crate rayon;
 extern crate scheduled_thread_pool;
+extern crate bcrypt;
 
 mod middleware;
 mod pool;
 mod api;
 mod mq;
+mod user;
 
 use std::env;
 
