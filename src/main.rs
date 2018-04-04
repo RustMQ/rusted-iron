@@ -26,6 +26,7 @@ mod pool;
 mod api;
 mod mq;
 mod user;
+mod auth;
 
 use std::env;
 
