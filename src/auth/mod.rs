@@ -1,5 +1,7 @@
 use bcrypt;
 use bcrypt::{DEFAULT_COST, hash};
+use redis::Connection;
+use middleware::auth::AuthMiddlewareData;
 
 pub fn encode(password: String) -> String {
     match hash(password.as_str(), DEFAULT_COST) {
@@ -13,6 +15,13 @@ pub fn verify(password: String, encoded_value: String) -> bool {
         Ok(v) => v,
         Err(_e) => false
     }
+}
+
+pub fn is_authenticated(auth: &AuthMiddlewareData, con: &Connection) -> bool {
+    // find user by email
+    // retrive password
+    // comapre password with hashed version retrived from user
+    false
 }
 
 #[cfg(test)]

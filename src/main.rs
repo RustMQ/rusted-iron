@@ -42,7 +42,10 @@ use gotham::{
 };
 
 use pool::*;
-use middleware::redis::RedisMiddleware;
+use middleware::{
+    auth::AuthMiddleware,
+    redis::RedisMiddleware
+};
 
 use api::{
     queue::QueuePathExtractor,
@@ -56,7 +59,10 @@ fn router(pool: Pool) -> Router {
     let redis_middleware = RedisMiddleware::with_pool(pool);
 
     let (chain, pipelines) = single_pipeline(
-        new_pipeline().add(redis_middleware).build()
+        new_pipeline()
+            .add(redis_middleware)
+            .add(AuthMiddleware)
+            .build()
     );
 
     build_router(chain, pipelines, |route| {
