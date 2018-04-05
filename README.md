@@ -3,15 +3,6 @@
 Iron MQ build with Rust
 
 ## Prerequisites
-We used [Rocket](https://rocket.rs) which is required nighlty version of Rust.
-Once `rustup` is installed, configure Rust nightly as your default toolchain by running the command:
-```
-rustup default nightly
-```
-If you prefer, once we setup a project directory in the following section, you can use per-directory overrides to use the nightly version only for your Rocket project by running the following command in the directory:
-```
-rustup override set nightly
-```
 
 ## Heroku
 
@@ -38,6 +29,8 @@ Currently we don't have API or DB migration for Redis, that's why we need manual
 ```
 $ SET queue:1:msg:counter 1
 $ HMSET queue:1 name "sample queue" class "pull" totalrecv 0 totalsent 0
+$ HMSET user:<some_id> email <email> first_name <user_fn> last_name <user_ln> created_at 2018-04-04T07:10:00.000Z password <bcrypted_password>
 ```
+For password generation: https://www.dailycred.com/article/bcrypt-calculator
 
 **Note**: For integration testing we need to have an up and running Redis DB instance with initialized state.
