@@ -69,9 +69,8 @@ impl Middleware for AuthMiddleware {
             connection
         };
 
-        info!("AUTH: {:?}", auth);
         let is_authenticated = is_authenticated(&auth, &connection);
-        info!("IS_AUTH: {}", is_authenticated);
+        
         if !is_authenticated {
             let res = create_response(&state, StatusCode::Unauthorized, None);
             return Box::new(future::ok((state, res)))
