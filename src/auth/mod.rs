@@ -41,7 +41,7 @@ mod tests {
 
     #[test]
     fn can_verify_own_generated_hash() {
-        let encoded = encode("superuser123!");
+        let encoded = encode("superuser123!".to_string());
         assert_eq!(true, verify("superuser123!", encoded.as_str()));
     }
 
