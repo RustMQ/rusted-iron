@@ -1,0 +1,9 @@
+[package]
+name = "pusher"
+version = "0.1.0"
+authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
+
+[dependencies]
+futures = "0.1"
+tokio = "0.1"
+tokio-timer = "0.2"
