@@ -1,0 +1,10 @@
+[package]
+name = "queue"
+version = "0.1.0"
+authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
+publish = false
+
+[dependencies]
+serde_json = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
