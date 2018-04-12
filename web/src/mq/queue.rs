@@ -1,7 +1,12 @@
+extern crate serde_json;
+
 use std::collections::HashMap;
+use chrono::prelude::*;
 use redis::*;
 
 use mq::message::Message;
+use queue::queue_info::QueueInfo;
+
 
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
 pub enum QueueError {
@@ -129,6 +134,30 @@ impl Queue {
             totalrecv: Some(0),
             totalsent: Some(0)
         }
+    }
+
+    pub fn create_queue2(queue_info: QueueInfo, con: &Connection) -> QueueInfo {
+        let mut queue_key = String::new();
+        queue_key.push_str("queue:");
+        queue_key.push_str(&queue_info.name);
+        let now: DateTime<Utc> = Utc::now();
+        let mut pipe = pipe();
+        pipe.cmd("SADD").arg("queues".to_string()).arg(&queue_info.name).ignore();
+        pipe.cmd("HMSET").arg(&queue_key)
+            .arg("name".to_string())
+            .arg(&queue_info.name)
+            .arg("value".to_string())
+            .arg(serde_json::to_string(&queue_info).unwrap())
+            .arg("created_at".to_string())
+            .arg(serde_json::to_string(&now).unwrap())
+            .arg("totalrecv".to_string())
+            .arg(0)
+            .arg("totalsent".to_string())
+            .arg(0).ignore();
+        queue_key.push_str(":msg:counter");
+        let _: Vec<String> = pipe.cmd("SET").arg(queue_key).arg(0).query(con).unwrap();
+
+        queue_info
     }
 
     pub fn delete(queue_name: String, con: &Connection) -> bool {

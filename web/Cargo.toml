@@ -24,3 +24,5 @@ rayon = "1.0.0"
 num_cpus = "1.0"
 scheduled-thread-pool = "0.2.0"
 bcrypt = "0.2"
+chrono = { version = "0.4", features = ["serde"] }
+queue = { path = "../queue" }

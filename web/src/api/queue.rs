@@ -24,6 +24,7 @@ use mq::{
     },
     queue::Queue
 };
+use queue::queue_info::QueueInfo;
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueuePathExtractor {
@@ -44,7 +45,12 @@ pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
                     let path = QueuePathExtractor::borrow_from(&state);
                     path.name.clone()
                 };
-                let queue = Queue::create_queue(name, &connection);
+
+                let body_content = String::from_utf8(_valid_body.to_vec()).unwrap();
+                let v: Value = serde_json::from_str(&body_content).unwrap();
+                let q: QueueInfo = serde_json::from_value(v["queue"].clone()).unwrap();
+
+                let queue = Queue::create_queue2(q, &connection);
 
                 let body = json!({
                     "queue": queue

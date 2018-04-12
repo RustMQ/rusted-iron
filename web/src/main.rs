@@ -20,6 +20,8 @@ extern crate env_logger;
 extern crate rayon;
 extern crate scheduled_thread_pool;
 extern crate bcrypt;
+extern crate queue;
+extern crate chrono;
 
 mod middleware;
 mod pool;
