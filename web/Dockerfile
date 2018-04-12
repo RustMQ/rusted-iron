@@ -1,10 +1,8 @@
 FROM rust:1.25 as build
 
-WORKDIR /usr/src/rusted-iron
+WORKDIR /usr/src/rusted-iron-web
 
 ADD Cargo.toml Cargo.toml
-
-ADD Cargo.lock Cargo.lock
 
 ADD src src
 
@@ -14,7 +12,7 @@ FROM heroku/heroku:16
 RUN useradd -m iron
 USER iron
 
-WORKDIR /app
-COPY --from=build /usr/src/rusted-iron/target/release/rusted-iron .
+WORKDIR /web
+COPY --from=build /usr/src/rusted-iron-web/target/release/web .
 
-CMD [ "/bin/bash", "-c", "env && ls -al && ./rusted-iron" ]
+CMD [ "/bin/bash", "-c", "env && ls -al && ./web" ]
