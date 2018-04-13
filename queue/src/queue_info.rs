@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum QueueType {
     Pull,
@@ -8,7 +8,7 @@ pub enum QueueType {
     Multicast
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct QueueInfo {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")] pub project_id: Option<String>,
@@ -75,7 +75,7 @@ impl QueueInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PushInfo {
     pub retries_delay: u32,
     pub retries: u32,
@@ -83,7 +83,7 @@ pub struct PushInfo {
     pub error_queue: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct QueueSubscriber {
     name: String,
     url: String,
@@ -104,23 +104,23 @@ impl QueueSubscriber {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Direction {
     Asc,
     Desc,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum AlertType {
     Fixed,
     Progressive,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Alert {
-    #[serde(rename = "type")] 
+    #[serde(rename = "type")]
     pub alert_type: AlertType,
     pub trigger: u32,
     pub queue: String,
@@ -157,7 +157,7 @@ pub struct PushStatus {
     pub subscriber_name: String,
     pub retries_remaining: u32,
     pub tries: u32,
-	pub status_code: Option<u32>,     
+	pub status_code: Option<u32>,
 	pub url: String,
     pub msg: Option<String>
 }

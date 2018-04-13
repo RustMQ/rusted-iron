@@ -14,6 +14,7 @@ extern crate serde_json;
 extern crate objectid;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_redis;
 #[macro_use]
 extern crate log;
 extern crate env_logger;

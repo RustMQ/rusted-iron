@@ -1,9 +1,8 @@
 extern crate serde_json;
 
-use std::collections::HashMap;
 use chrono::prelude::*;
 use redis::*;
-
+use serde_redis::RedisDeserialize;
 use mq::message::Message;
 use queue::queue_info::QueueInfo;
 
@@ -16,7 +15,7 @@ pub enum QueueError {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Queue {
     pub name: Option<String>,
-    pub class: Option<String>,
+    pub value: Option<String>,
     pub totalrecv: Option<i32>,
     pub totalsent: Option<i32>
 }
@@ -31,8 +30,8 @@ pub const DEFAULT_QUEUE_KEY: &'static str = "queue:";
 impl Queue {
     fn new() -> Queue {
         Queue {
-            class: None,
             name: None,
+            value: None,
             totalrecv: None,
             totalsent: None
         }
@@ -46,31 +45,6 @@ impl Queue {
         key
     }
 
-    fn new_from_hash(queue_name: String, hash_map: HashMap<String, String>) -> Queue {
-        let mut queue = Queue::new();
-        queue.name = Some(queue_name);
-
-        match hash_map.get(&*"class") {
-            Some(v) => {
-                queue.class = Some(v.to_string());
-            },
-            _ => queue.class = None
-        }
-        match hash_map.get(&*"totalrecv") {
-            Some(v) => {
-                queue.totalrecv = Some(v.parse::<i32>().unwrap());
-            },
-            _ => queue.totalrecv = None
-        }
-        match hash_map.get(&*"totalsent") {
-            Some(v) => {
-                queue.totalsent = Some(v.parse::<i32>().unwrap());
-            },
-            _ => queue.totalsent = None
-        }
-
-        queue
-    }
 
     pub fn list_queues(con: &Connection) -> Vec<QueueLite> {
         let r: Vec<String> = cmd("SMEMBERS").arg("queues".to_string()).query(con).unwrap();
@@ -86,9 +60,19 @@ impl Queue {
 
     pub fn get_queue(queue_name: &String, con: &Connection) -> Queue {
         let queue_key = Queue::get_queue_key(queue_name);
-        let result: HashMap<String, String> = cmd("HGETALL").arg(queue_key).query(con).unwrap();
+        let v: Result<Value, RedisError> = con.hgetall(queue_key);
 
-        Queue::new_from_hash(queue_name.to_string(), result)
+        let result: Queue = match v {
+            Ok(v) => {
+                v.deserialize().unwrap()
+            },
+            Err(e) => {
+                debug!("qet_queue error: {:?}", e);
+                Queue::new()
+            },
+        };
+
+        result
     }
 
     pub fn get_message_counter_key(queue_id: &String) -> String {
@@ -101,13 +85,7 @@ impl Queue {
     }
 
     pub fn post_message(queue: Queue, message: Message, con: &Connection) -> Result<i32, QueueError> {
-        let q = Queue {
-            class: queue.class,
-            name: queue.name,
-            totalrecv: queue.totalrecv,
-            totalsent: queue.totalsent
-        };
-        Ok(Message::push_message(q, message, con))
+        Ok(Message::push_message(queue.clone(), message, con))
     }
 
     pub fn create_queue(queue_name: String, con: &Connection) -> Queue {
@@ -130,7 +108,7 @@ impl Queue {
 
         Queue {
             name: Some(queue_name),
-            class: Some("pull".to_string()),
+            value: Some("pull".to_string()),
             totalrecv: Some(0),
             totalsent: Some(0)
         }
