@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum QueueType {
     Pull,
