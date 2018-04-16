@@ -85,9 +85,10 @@ pub struct PushInfo {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct QueueSubscriber {
-    name: String,
-    url: String,
-    #[serde(skip_serializing_if = "Option::is_none")] headers: Option<HashMap<String, String>>,
+    pub name: String,
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<HashMap<String, String>>,
 }
 
 impl QueueSubscriber {
