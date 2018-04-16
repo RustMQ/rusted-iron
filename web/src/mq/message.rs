@@ -1,10 +1,15 @@
 extern crate redis;
+extern crate serde_json;
 
 use std::collections::{HashMap};
 use objectid::{ObjectId};
 use redis::*;
 use api::message::MessageDeleteBodyRequest;
 use mq::queue::Queue;
+use queue::{
+    message::PushMessage,
+    queue_info::{QueueInfo, QueueType}
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
@@ -93,6 +98,31 @@ impl Message {
 
             Ok(Some(msg_id))
         }).unwrap();
+
+        let qi_as_string = match queue.value {
+            Some(v) => v,
+            None => {
+                debug!("QI parse error: {:?}", queue.value);
+                String::new()
+            }
+        };
+
+        let qi: QueueInfo = serde_json::from_str(qi_as_string.as_str()).unwrap();
+        let queue_type = qi.queue_type.clone().unwrap();
+        if queue_type == QueueType::Unicast || queue_type == QueueType::Multicast {
+            let pm: PushMessage = PushMessage {
+                queue_info: qi,
+                msg_body: msg_body
+            };
+            let mut msg_channel_key = String::new();
+            msg_channel_key.push_str(&queue_key.clone());
+            msg_channel_key.push_str(":msg:channel");
+
+            let _ : isize = cmd("PUBLISH")
+                .arg(&msg_channel_key)
+                .arg(serde_json::to_string(&pm).unwrap())
+                .query(con).unwrap();
+        }
 
         msg_id
     }
