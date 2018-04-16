@@ -1,3 +1,5 @@
+use queue_info::QueueInfo;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Message {
     pub body: String,
@@ -5,6 +7,12 @@ pub struct Message {
     #[serde(skip_serializing_if = "Option::is_none")] pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")] pub reserved_count: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")] pub reservation_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PushMessage {
+    pub queue_info: QueueInfo,
+    pub msg_body: String
 }
 
 impl Message {
