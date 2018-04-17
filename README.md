@@ -27,10 +27,9 @@ $ docker run -it --rm --link rust-redis:rust-redis --env-file ./env.list --name 
 ### Redis in development
 Currently we don't have API or DB migration for Redis, that's why we need manually run commands below to initialize DB state:
 ```
-$ SET queue:1:msg:counter 1
-$ HMSET queue:1 name "sample queue" class "pull" totalrecv 0 totalsent 0
+$ SADD email:<email> <user_id>
 $ HMSET user:<some_id> email <email> first_name <user_fn> last_name <user_ln> created_at 2018-04-04T07:10:00.000Z password <bcrypted_password>
 ```
-For password generation: https://www.dailycred.com/article/bcrypt-calculator
+For password generation any bcrypt online tool could be used, i.e. https://www.dailycred.com/article/bcrypt-calculator
 
 **Note**: For integration testing we need to have an up and running Redis DB instance with initialized state.
