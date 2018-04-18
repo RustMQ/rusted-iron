@@ -128,12 +128,10 @@ fn router(pool: Pool) -> Router {
 pub fn main() {
     env_logger::init();
 
-    info!("starting up");
     let pool = new_pool();
     let port: String = env::var("PORT").expect("$PORT is provided");
-    info!("PORT: {:?}", port);
 
     let addr = format!("0.0.0.0:{}", port);
-    info!("Gotham started on: {}", addr);
+    info!("Rusted-Iron web started on: {}", addr);
     gotham::start(addr, router(pool))
 }
