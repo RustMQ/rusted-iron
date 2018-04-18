@@ -2,6 +2,9 @@ extern crate redis;
 extern crate reqwest;
 extern crate serde_json;
 extern crate queue;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 use redis::Client;
 use std::{env, thread};
@@ -9,7 +12,7 @@ use std::collections::HashMap;
 use reqwest::header::{Headers, UserAgent};
 
 use queue::{
-    queue_info::{PushInfo, QueueSubscriber},
+    queue_info::{PushInfo, QueueSubscriber, QueueType},
     message::PushMessage
 };
 
@@ -25,6 +28,9 @@ fn construct_headers(headers: HashMap<String, String>) -> Headers {
 }
 
 fn main() {
+    env_logger::init();
+
+    info!("pusher starting up");
     let database_url = env::var("REDISCLOUD_URL").expect("$REDISCLOUD_URL is provided");
     let client = Client::open(database_url.as_str()).expect("Failed to obtain client");
     let mut pubsub = client.get_pubsub().expect("Failed to obtain pub-sub");
@@ -36,9 +42,9 @@ fn main() {
         if !payload.is_empty() {
             let builder = thread::Builder::new();
             builder.spawn(move || {
-                println!("channel '{}': {}", msg.get_channel_name(), payload);
+                info!("channel '{}': {}", msg.get_channel_name(), payload);
                 let pm: PushMessage = serde_json::from_str(&payload).unwrap();
-                let (msg_body, subscribers) =  {
+                let (msg_body, subscribers, queue_type) =  {
                     let push_info: Option<PushInfo> = pm.queue_info.push.clone();
                     let subscribers: Vec<QueueSubscriber> = match push_info {
                         Some(pi) => {
@@ -48,12 +54,12 @@ fn main() {
                     };
 
 
-                    (pm.msg_body, subscribers)
+                    (pm.msg_body, subscribers, pm.queue_info.queue_type)
                 };
 
                 for subscriber in subscribers {
-                    println!("Subscriber: {:?}", subscriber.url);
-                    println!("MSG: {:?}", msg_body);
+                    info!("Subscriber: {:#?}", subscriber.url);
+                    info!("MSG: {:#?}", msg_body);
                     let reqwest_client = reqwest::Client::new();
                     let content = msg_body.clone();
                     let headers = subscriber.headers.unwrap();
@@ -61,7 +67,19 @@ fn main() {
                         .headers(construct_headers(headers))
                         .body(content)
                         .send().unwrap();
-                    println!("Posted: {:?}", res);
+                    let is_unicast_mode = |queue_type: Option<QueueType>| queue_type.unwrap() == QueueType::Unicast;
+
+                    if res.status().is_success() {
+                        info!("Message successfully sent.");
+                        if is_unicast_mode(queue_type.clone()) {
+                            break;
+                        }
+                    } else if res.status().is_server_error() {
+                        info!("Message moved to error_queue.");
+                    } else {
+                        info!("Something else happened. Status: {:?}", res.status());
+                        info!("Message moved to error_queue.");
+                    }
                 }
             }).unwrap();
         }
