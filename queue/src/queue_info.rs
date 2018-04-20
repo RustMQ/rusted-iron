@@ -80,7 +80,8 @@ pub struct PushInfo {
     pub retries_delay: u32,
     pub retries: u32,
     pub subscribers: Vec<QueueSubscriber>,
-    pub error_queue: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_queue: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
