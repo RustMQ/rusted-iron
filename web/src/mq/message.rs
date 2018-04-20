@@ -15,7 +15,8 @@ use queue::{
 pub struct Message {
     pub id: Option<String>,
     pub body: Option<String>,
-    pub reservation_id: Option<String>
+    pub reservation_id: Option<String>,
+    pub source_msg_id: Option<String>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,7 +32,8 @@ impl Message {
         Message {
             id: None,
             body: None,
-            reservation_id: None
+            reservation_id: None,
+            source_msg_id: None
         }
     }
 
@@ -53,6 +55,13 @@ impl Message {
             _ => msg.reservation_id = None
         }
 
+        match hash_map.get(&*"source_msg_id") {
+            Some(v) => {
+                msg.source_msg_id = Some(v.to_string());
+            },
+            _ => msg.source_msg_id = None
+        }
+
         msg
     }
 
@@ -69,10 +78,19 @@ impl Message {
         msg_key.push_str(&queue_key);
         msg_key.push_str(":msg:");
         let msg_body: String = message.body.expect("Message body");
-
+        let mut msg = ::queue::message::Message {
+            id: None,
+            delay: None,
+            body: msg_body.clone(),
+            source_msg_id: None,
+            reservation_id: None,
+            reserved_count: None,
+        };
         let msg_id = redis::transaction(con, &[&msg_counter_key], |pipe| {
             let msg_id: i32 = cmd("GET").arg(&msg_counter_key).query(con).unwrap();
             msg_key.push_str(&msg_id.to_string());
+            let oid = ObjectId::new().unwrap();
+            msg.source_msg_id = Some(oid.clone().to_string());
             let _response: Result<Vec<String>, RedisError> = pipe
                     .atomic()
                     .cmd("HMSET")
@@ -81,6 +99,8 @@ impl Message {
                         .arg(&msg_body)
                         .arg("id")
                         .arg(&msg_id.to_string())
+                        .arg("source_msg_id")
+                        .arg(&oid.to_string())
                     .cmd("ZADD")
                         .arg(&queue_unreserved_key)
                         .arg(&msg_id.to_string())
@@ -98,7 +118,7 @@ impl Message {
 
             Ok(Some(msg_id))
         }).unwrap();
-
+        msg.id = Some(msg_id.clone().to_string());
         let qi_as_string = match queue.value {
             Some(v) => v,
             None => {
@@ -112,7 +132,7 @@ impl Message {
         if queue_type == QueueType::Unicast || queue_type == QueueType::Multicast {
             let pm: PushMessage = PushMessage {
                 queue_info: qi,
-                msg_body: msg_body
+                msg: msg
             };
             let mut msg_channel_key = String::new();
             msg_channel_key.push_str(&queue_key.clone());
@@ -243,7 +263,8 @@ impl Message {
         let m = Message {
             id: Some(message_id),
             body: None,
-            reservation_id: None
+            reservation_id: None,
+            source_msg_id: None,
         };
 
         Message::delete_message(&queue_name, &m, con)

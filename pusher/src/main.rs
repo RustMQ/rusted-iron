@@ -65,7 +65,7 @@ fn main() {
                     }
                 };
 
-                let (msg_body, subscribers, queue_type) =  {
+                let (msg, subscribers, queue_type) =  {
                     let push_info: Option<PushInfo> = pm.queue_info.push.clone();
                     let subscribers: Vec<QueueSubscriber> = match push_info {
                         Some(pi) => {
@@ -75,7 +75,7 @@ fn main() {
                     };
 
 
-                    (pm.msg_body, subscribers, pm.queue_info.queue_type)
+                    (pm.msg, subscribers, pm.queue_info.queue_type)
                 };
 
                 let is_unicast_mode = |queue_type: Option<QueueType>| queue_type.unwrap() == QueueType::Unicast;
@@ -85,9 +85,9 @@ fn main() {
                     let mut break_retry = false;
                     for subscriber in subscribers.clone() {
                         info!("Subscriber: {:#?}", subscriber.url);
-                        info!("MSG: {:#?}", msg_body);
+                        info!("MSG: {:#?}", msg.body);
                         let reqwest_client = reqwest::Client::new();
-                        let content = msg_body.clone();
+                        let content = msg.body.clone();
                         let headers = subscriber.headers.unwrap();
                         let res = reqwest_client.post(subscriber.url.as_str())
                             .headers(construct_headers(headers))
