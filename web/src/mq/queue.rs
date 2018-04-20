@@ -135,6 +135,14 @@ impl Queue {
         queue_key.push_str(":msg:counter");
         let _: Vec<String> = pipe.cmd("SET").arg(queue_key).arg(0).query(con).unwrap();
 
+        if queue_info.clone().push.is_some() {
+            let push = queue_info.clone().push.unwrap();
+            if !push.error_queue.is_none() {
+                let qi = QueueInfo::new(push.error_queue.unwrap());
+                let _ = Queue::create_queue2(qi, con);
+            }
+        }
+
         queue_info
     }
 
