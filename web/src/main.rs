@@ -23,6 +23,7 @@ extern crate scheduled_thread_pool;
 extern crate bcrypt;
 extern crate queue;
 extern crate chrono;
+extern crate failure;
 
 mod middleware;
 mod pool;
@@ -81,6 +82,9 @@ fn router(pool: Pool) -> Router {
             route.put("")
                 .with_path_extractor::<QueuePathExtractor>()
                 .to(api::queue::put_queue);
+            route.get("")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(api::queue::get_queue_info);
             route
                 .post("/messages")
                 .with_path_extractor::<QueuePathExtractor>()

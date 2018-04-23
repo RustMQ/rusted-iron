@@ -285,3 +285,49 @@ pub fn push_messages_via_webhook(mut state: State) -> Box<HandlerFuture> {
 
     Box::new(f)
 }
+
+pub fn get_queue_info(mut state: State) -> Box<HandlerFuture> {
+        let f = Body::take_from(&mut state)
+            .concat2()
+            .then(|full_body| match full_body {
+                Ok(_valid_body) => {
+                    let connection = {
+                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                        let connection = redis_pool.conn().unwrap();
+                        connection
+                    };
+
+                    let name: String = {
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        path.name.clone()
+                    };
+
+                    let queue_info;
+                    match Queue::get_queue_info(name, &connection) {
+                        Ok(res) => queue_info = res,
+                        Err(err) => {
+                            info!("Error: {:?}", err);
+                            queue_info = QueueInfo::new("panic!".to_owned())
+                        }
+                    };
+
+                    let body = json!({
+                        "queue": queue_info
+                    });
+
+                    let res = create_response(
+                        &state,
+                        StatusCode::Ok,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        ))
+                    );
+
+                    future::ok((state, res))
+                },
+                Err(e) => future::err((state, e.into_handler_error()))
+            });
+
+        Box::new(f)
+}

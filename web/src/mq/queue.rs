@@ -6,6 +6,7 @@ use serde_redis::RedisDeserialize;
 use mq::message::Message;
 use queue::queue_info::QueueInfo;
 
+use failure::Error;
 
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
 pub enum QueueError {
@@ -159,5 +160,16 @@ impl Queue {
         }
 
         true
+    }
+
+    pub fn get_queue_info(queue_name: String, con: &Connection) -> Result<QueueInfo, Error> {
+        let queue = Queue::get_queue(&queue_name, con);
+        let queue_info_as_str = match queue.value {
+            Some(v) => v,
+            None => String::new()
+        };
+
+        let queue_info: QueueInfo = serde_json::from_str(&queue_info_as_str).unwrap();
+        return Ok(queue_info);
     }
 }
