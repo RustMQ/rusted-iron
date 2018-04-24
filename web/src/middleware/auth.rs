@@ -1,9 +1,11 @@
+use std::env;
 use futures::{future, Future};
 use hyper::{
     header::{
         Headers,
         Authorization,
-        Basic
+        Basic,
+        UserAgent
     },
     StatusCode,
 };
@@ -50,44 +52,71 @@ impl Middleware for AuthMiddleware {
     where
         Chain: FnOnce(State) -> Box<HandlerFuture>,
     {
-        let auth: AuthMiddlewareData = {
+        let service_token: String = env::var("SERVICE_TOKEN").expect("$SERVICE_TOKEN is provided");
+        let skip_auth = {
             let headers: &Headers = Headers::borrow_from(&state);
-            match headers.get::<Authorization<Basic>>() {
-                Some(header) => AuthMiddlewareData::from_header(header),
-                None => {
-                    ("No authorization header found");
-                    AuthMiddlewareData{
-                        email: String::new(),
-                        password_plain: String::new()
+            match headers.get::<UserAgent>() {
+                Some(header) => {
+                    trace!("Header: {:#?}", header);
+                    header.starts_with(service_token.as_str())
+                },
+                None => false,
+            }
+        };
+
+        if skip_auth {
+            let result = chain(state);
+
+            let f = result.and_then(move |(state, response)| {
+                {
+                    trace!("[{}] post chain", request_id(&state));
+                }
+
+                future::ok((state, response))
+            });
+
+            Box::new(f)
+        } else {
+            let auth: AuthMiddlewareData = {
+                let headers: &Headers = Headers::borrow_from(&state);
+
+                match headers.get::<Authorization<Basic>>() {
+                    Some(header) => AuthMiddlewareData::from_header(header),
+                    None => {
+                        ("No authorization header found");
+                        AuthMiddlewareData{
+                            email: String::new(),
+                            password_plain: String::new()
+                        }
                     }
                 }
-            }
-        };
-        let connection = {
-            let redis_pool = RedisPool::borrow_mut_from(&mut state);
-            let connection = redis_pool.conn().unwrap();
-            connection
-        };
+            };
+            let connection = {
+                let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                let connection = redis_pool.conn().unwrap();
+                connection
+            };
 
-        let is_authenticated = is_authenticated(&auth, &connection);
-        
-        if !is_authenticated {
-            let res = create_response(&state, StatusCode::Unauthorized, None);
-            return Box::new(future::ok((state, res)))
+            let is_authenticated = is_authenticated(&auth, &connection);
+
+            if !is_authenticated {
+                let res = create_response(&state, StatusCode::Unauthorized, None);
+                return Box::new(future::ok((state, res)))
+            }
+
+            state.put(auth);
+
+            let result = chain(state);
+
+            let f = result.and_then(move |(state, response)| {
+                {
+                    trace!("[{}] post chain", request_id(&state));
+                }
+
+                future::ok((state, response))
+            });
+
+            Box::new(f)
         }
-
-        state.put(auth);
-
-        let result = chain(state);
-
-        let f = result.and_then(move |(state, response)| {
-            {
-                trace!("[{}] post chain", request_id(&state));
-            }
-
-            future::ok((state, response))
-        });
-
-        Box::new(f)
     }
 }
