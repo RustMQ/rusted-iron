@@ -1,5 +1,6 @@
 extern crate redis;
 extern crate reqwest;
+#[macro_use]
 extern crate serde_json;
 extern crate queue;
 #[macro_use]
@@ -13,11 +14,11 @@ use std::{
     thread,
     time::Duration
 };
-use reqwest::header::{Headers, UserAgent};
+use reqwest::header::{Headers, UserAgent, ContentType};
 
 use queue::{
     queue_info::{PushInfo, QueueSubscriber, QueueType},
-    message::PushMessage
+    message::{PushMessage, Message}
 };
 
 #[derive(Debug)]
@@ -65,17 +66,17 @@ fn main() {
                     }
                 };
 
-                let (msg, subscribers, queue_type) =  {
+                let (msg, subscribers, queue_type, error_queue_name) =  {
                     let push_info: Option<PushInfo> = pm.queue_info.push.clone();
-                    let subscribers: Vec<QueueSubscriber> = match push_info {
+                    let (subscribers, error_queue_name): (Vec<QueueSubscriber>, String) = match push_info {
                         Some(pi) => {
-                            pi.subscribers
+                            (pi.subscribers, pi.error_queue.unwrap())
                         },
-                        None => Vec::new(),
+                        None => (Vec::new(), String::new()),
                     };
 
 
-                    (pm.msg, subscribers, pm.queue_info.queue_type)
+                    (pm.msg, subscribers, pm.queue_info.queue_type, error_queue_name)
                 };
 
                 let is_unicast_mode = |queue_type: Option<QueueType>| queue_type.unwrap() == QueueType::Unicast;
@@ -102,7 +103,6 @@ fn main() {
                             }
                         } else {
                             info!("Something else happened. Status: {:?}", res.status());
-                            info!("Message moved to error_queue.");
                             break_retry = false;
                         }
                     }
@@ -113,6 +113,29 @@ fn main() {
                     }
                     if retry.retry_count == i {
                         info!("No delivery. Moved to error_queue.");
+                        if error_queue_name.is_empty() {
+                            break;
+                        }
+
+                        let reqwest_client = reqwest::Client::new();
+                        let mut headers = Headers::new();
+                        headers.set(ContentType::json());
+                        headers.set(UserAgent::new("pusher/0.1.0"));
+                        let web_api_url = env::var("WEB_API_URL").expect("$WEB_API_URL is provided");
+                        let path = format!("{}/queues/{}/messages", web_api_url, error_queue_name);
+                        info!("PATH: {:?}", path);
+                        let mut messages: Vec<Message> = Vec::new();
+                        let mut m = Message::new(payload.as_str(), 0);
+                        messages.push(m);
+                        let body = json!(messages);
+                        let res = reqwest_client
+                            .post(path.as_str())
+                            .headers(headers)
+                            .body(body.to_string().into_bytes())
+                            .send()
+                            .unwrap();
+
+                        debug!("Pushed to error_queue: {:#?}", res);
                         break;
                     }
 
