@@ -19,14 +19,19 @@ pub fn verify(password: &str, encoded_value: &str) -> bool {
 }
 
 pub fn is_authenticated(auth: &AuthMiddlewareData, con: &Connection) -> bool {
-    let user: User = User::find_by_email(auth.email.clone(), con);
-
-    let p = match user.password {
-        Some(p) => p,
-        None => String::new(),
-    };
-
-    verify(auth.password_plain.clone().as_str(), p.as_str())
+    match User::find_by_email(auth.email.clone(), con) {
+        Ok(user) => {
+            let p = match user.password {
+                Some(p) => p,
+                None => String::new(),
+            };
+            return verify(auth.password_plain.clone().as_str(), p.as_str())
+        },
+        Err(err) => {
+            info!("Auth error: {:#?}", err);
+            return false
+        }
+    }
 }
 
 #[cfg(test)]

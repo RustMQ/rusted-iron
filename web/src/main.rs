@@ -4,7 +4,6 @@ extern crate gotham;
 extern crate gotham_derive;
 extern crate hyper;
 extern crate mime;
-
 extern crate redis;
 extern crate r2d2;
 extern crate r2d2_redis;
@@ -23,6 +22,7 @@ extern crate scheduled_thread_pool;
 extern crate bcrypt;
 extern crate queue;
 extern crate chrono;
+#[macro_use]
 extern crate failure;
 
 mod middleware;

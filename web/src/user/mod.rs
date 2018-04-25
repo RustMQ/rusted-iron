@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use auth::{encode};
+use serde_redis::RedisDeserialize;
 use redis::*;
+use failure::Error;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
@@ -11,72 +11,22 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(first_name: String, last_name: String, email: String, password: String) -> Result<User, String> {
-        let encoded_password = encode(password);
-        if encoded_password == String::from("Failed to encode") {
-            return Err("not created".to_string())
-        }
-
-        return Ok(
-            User {
-                first_name: Some(first_name),
-                last_name: Some(last_name),
-                email: Some(email),
-                password: Some(encoded_password)
-            }
-        )
-    }
-
-    pub fn new_from_hash(map: HashMap<String, String>) -> Self {
-        let mut user = User{
-            first_name: None,
-            last_name: None,
-            email: None,
-            password: None
-        };
-
-        match map.get(&*"first_name") {
-            Some(v) => {
-                user.first_name = Some(v.to_string());
-            },
-            _ => user.first_name = None
-        }
-
-        match map.get(&*"last_name") {
-            Some(v) => {
-                user.last_name = Some(v.to_string());
-            },
-            _ => user.last_name = None
-        }
-
-        match map.get(&*"email") {
-            Some(v) => {
-                user.email = Some(v.to_string());
-            },
-            _ => user.email = None
-        }
-
-        match map.get(&*"password") {
-            Some(v) => {
-                user.password = Some(v.to_string());
-            },
-            _ => user.password = None
-        }
-
-        user
-    }
-
-    pub fn find_by_email(email: String, con: &Connection) -> Self {
+    pub fn find_by_email(email: String, con: &Connection) -> Result<User, Error> {
         let mut email_key = String::new();
         email_key.push_str("email:");
         email_key.push_str(email.as_str());
 
-        let user_ids: Vec<String> = con.smembers(email_key).unwrap();
+        let user_ids: Vec<String> = con.smembers(&email_key)?;
+        if user_ids.is_empty() {
+            return Err(format_err!("No user with key: {}", &email_key));
+        }
+        let user_id = user_ids.first();
         let mut user_key = String::new();
         user_key.push_str("user:");
-        user_key.push_str(user_ids.first().unwrap().as_str());
-        let user_map: HashMap<String, String> = con.hgetall(user_key).unwrap();
+        user_key.push_str(user_id.unwrap_or(&String::from("000000000000000000000000")).as_str());
+        let v: Value = con.hgetall(&user_key)?;
+        let user: User = v.deserialize()?;
 
-        User::new_from_hash(user_map)
+        Ok(user)
     }
 }
