@@ -4,8 +4,12 @@ use chrono::prelude::*;
 use redis::*;
 use serde_redis::RedisDeserialize;
 use mq::message::Message;
-use queue::queue_info::QueueInfo;
-
+use queue::queue_info::{
+    QueueInfo,
+    QueueSubscriber,
+    PushInfo,
+};
+use std::collections::HashMap;
 use failure::Error;
 
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
@@ -171,5 +175,58 @@ impl Queue {
 
         let queue_info: QueueInfo = serde_json::from_str(&queue_info_as_str).unwrap();
         return Ok(queue_info);
+    }
+
+    pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> bool {
+        let queue_info_res = Queue::get_queue_info(queue_name, con);
+        let mut current_subscribers;
+        let mut queue_info = queue_info_res.unwrap();
+        match queue_info.clone().push {
+            Some(push) => {
+                current_subscribers = push.subscribers;
+            },
+            None => {
+                info!("Broken subscribers!");
+                current_subscribers = Vec::new();
+            },
+        };
+        current_subscribers.append(&mut new_subscribers);
+        let unique_subscribers: HashMap<_, _> = current_subscribers.iter()
+            .map(|subscriber| (subscriber.name.clone(), subscriber))
+            .collect();
+        if queue_info.push.is_some() {
+            let push = queue_info.push.unwrap();
+            let mut subscribers = Vec::new();
+            for (_, val) in unique_subscribers {
+                subscribers.push(val.clone());
+            }
+
+            let new_push = PushInfo {
+                    retries_delay: push.retries_delay,
+                    retries: push.retries,
+                    subscribers: subscribers,
+                    error_queue: push.error_queue
+                };
+
+            queue_info.push = Some(new_push);
+            
+            return Queue::update_queue_info(queue_info, con)
+        }
+
+        false
+    }
+
+    pub fn update_queue_info(queue_info: QueueInfo, con: &Connection) -> bool {
+        let mut queue_key = String::new();
+        queue_key.push_str("queue:");
+        queue_key.push_str(&queue_info.name);
+        let _: () = cmd("HSET")
+            .arg(queue_key)
+            .arg("value")
+            .arg(serde_json::to_string(&queue_info).unwrap())
+            .query(con).unwrap();
+
+
+        true
     }
 }

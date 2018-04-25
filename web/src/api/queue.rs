@@ -24,7 +24,7 @@ use mq::{
     },
     queue::Queue
 };
-use queue::queue_info::QueueInfo;
+use queue::queue_info::{QueueInfo, QueueSubscriber};
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueuePathExtractor {
@@ -330,4 +330,54 @@ pub fn get_queue_info(mut state: State) -> Box<HandlerFuture> {
             });
 
         Box::new(f)
+}
+
+
+pub fn update_subscribers(mut state: State) -> Box<HandlerFuture> {
+    let f = Body::take_from(&mut state)
+        .concat2()
+        .then(|full_body| match full_body {
+            Ok(valid_body) => {
+                let connection = {
+                    let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                    let connection = redis_pool.conn().unwrap();
+                    connection
+                };
+                let name: String = {
+                    let path = QueuePathExtractor::borrow_from(&state);
+                    path.name.clone()
+                };
+
+                let mut subscribers: Vec<QueueSubscriber> = {
+                    let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
+                    serde_json::from_value(body_content["subscribers"].clone()).unwrap()
+                };
+
+                let updated = Queue::update_subscribers(name, subscribers, &connection);
+                let body;
+                if updated {
+                    body = json!({
+                        "msg": String::from("Updated")
+                    });
+
+                } else {
+                    body = json!({
+                        "msg": String::from("Not Updated")
+                    });
+                }
+                let res = create_response(
+                    &state,
+                    StatusCode::Created,
+                    Some((
+                        body.to_string().into_bytes(),
+                        mime::APPLICATION_JSON
+                    )),
+                );
+
+                return future::ok((state, res));
+            },
+            Err(e) => future::err((state, e.into_handler_error()))
+        });
+
+    Box::new(f)
 }

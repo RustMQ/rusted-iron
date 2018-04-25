@@ -124,7 +124,9 @@ fn router(pool: Pool) -> Router {
             route.post("/messages/:message_id/release")
                 .with_path_extractor::<MessagePathExtractor>()
                 .to(api::message::release_message);
-
+            route.post("/subscribers")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(api::queue::update_subscribers)
         });
     })
 }
