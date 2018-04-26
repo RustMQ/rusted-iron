@@ -209,7 +209,7 @@ impl Queue {
                 };
 
             queue_info.push = Some(new_push);
-            
+
             return Queue::update_queue_info(queue_info, con)
         }
 
@@ -228,5 +228,26 @@ impl Queue {
 
 
         true
+    }
+
+    pub fn replace_subscribers(queue_name: String, new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> bool {
+        let queue_info_res = Queue::get_queue_info(queue_name, con);
+        let mut queue_info = queue_info_res.unwrap();
+        if queue_info.push.is_some() {
+            let push = queue_info.push.unwrap();
+
+            let new_push = PushInfo {
+                    retries_delay: push.retries_delay,
+                    retries: push.retries,
+                    subscribers: new_subscribers,
+                    error_queue: push.error_queue
+            };
+
+            queue_info.push = Some(new_push);
+
+            return Queue::update_queue_info(queue_info, con)
+        }
+
+        false
     }
 }
