@@ -90,7 +90,8 @@ fn main() {
                         let reqwest_client = reqwest::Client::new();
                         let content = msg.body.clone();
                         let headers = subscriber.headers.unwrap();
-                        let res = reqwest_client.post(subscriber.url.as_str())
+                        let url = subscriber.url.unwrap();
+                        let res = reqwest_client.post(url.as_str())
                             .headers(construct_headers(headers))
                             .body(content)
                             .send().unwrap();
