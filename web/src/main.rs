@@ -130,6 +130,9 @@ fn router(pool: Pool) -> Router {
             route.put("/subscribers")
                 .with_path_extractor::<QueuePathExtractor>()
                 .to(api::queue::replace_subscribers);
+            route.delete("/subscribers")
+                .with_path_extractor::<QueuePathExtractor>()
+                .to(api::queue::delete_subscribers);
         });
     })
 }

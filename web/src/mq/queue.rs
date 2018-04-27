@@ -250,4 +250,31 @@ impl Queue {
 
         false
     }
+
+    pub fn delete_subscribers(queue_name: String, subscribers_for_delete: Vec<QueueSubscriber>, con: &Connection) -> bool {
+        let queue_info_res = Queue::get_queue_info(queue_name.clone(), con);
+        let current_subscribers;
+        let queue_info = queue_info_res.unwrap();
+        match queue_info.clone().push {
+            Some(push) => {
+                current_subscribers = push.subscribers;
+            },
+            None => {
+                info!("Broken subscribers!");
+                current_subscribers = Vec::new();
+            },
+        };
+        if current_subscribers.len() == 1 {
+            return false;
+        }
+        let subscribers_for_delete_as_map: HashMap<_, _> = subscribers_for_delete.iter()
+            .map(|s| (s.name.clone(), s))
+            .collect();
+
+        let subscribers_for_update: Vec<QueueSubscriber> = current_subscribers.into_iter()
+            .filter(|subscriber| !subscribers_for_delete_as_map.contains_key(&subscriber.name))
+            .collect();
+
+        Queue::replace_subscribers(queue_name, subscribers_for_update, con)
+    }
 }
