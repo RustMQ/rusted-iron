@@ -224,7 +224,7 @@ pub fn delete_queue(mut state: State) -> Box<HandlerFuture> {
                     Queue::delete(name, &connection);
 
                     let body = json!({
-                        "msg": "Deleted"
+                        "msg": "Deleted."
                     });
 
                     let res = create_response(
