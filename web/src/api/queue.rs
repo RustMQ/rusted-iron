@@ -88,8 +88,11 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                         let path = QueuePathExtractor::borrow_from(&state);
                         path.name.clone()
                     };
-                    let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
-                    let messages: Vec<Message> = serde_json::from_str(&body_content).unwrap();
+
+                    let mut messages: Vec<Message> = {
+                        let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
+                        serde_json::from_value(body_content["messages"].clone()).unwrap()
+                    };
 
                     let q = Queue::get_queue(&name, &connection);
                     let mut result: Vec<String> = messages
