@@ -5,3 +5,4 @@ extern crate serde;
 
 pub mod queue_info;
 pub mod message;
+pub mod queue;

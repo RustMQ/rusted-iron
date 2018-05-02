@@ -22,9 +22,12 @@ use mq::{
         Message,
         ReserveMessageParams
     },
-    queue::Queue
+    queue::*
 };
-use queue::queue_info::{QueueInfo, QueueSubscriber};
+use queue::{
+    queue::{Queue},
+    queue_info::{QueueInfo, QueueSubscriber}
+};
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueuePathExtractor {
@@ -50,7 +53,7 @@ pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
                 let v: Value = serde_json::from_str(&body_content).unwrap();
                 let q: QueueInfo = serde_json::from_value(v["queue"].clone()).unwrap();
 
-                let queue = Queue::create_queue2(q, &connection);
+                let queue = create_queue2(q, &connection);
 
                 let body = json!({
                     "queue": queue
@@ -94,13 +97,13 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                         serde_json::from_value(body_content["messages"].clone()).unwrap()
                     };
 
-                    let q = Queue::get_queue(&name, &connection);
+                    let q = get_queue(&name, &connection);
                     let mut result: Vec<String> = messages
                         .into_iter()
                         .map(|msg| {
                             let mut m: Message = Message::new();
                             m.body = msg.body;
-                            let mid = Queue::post_message(q.clone(), m, &*connection).expect("Message put on queue.");
+                            let mid = post_message(q.clone(), m, &*connection).expect("Message put on queue.");
                             mid.to_string()
                         }).collect();
 
@@ -188,7 +191,7 @@ pub fn list_queues(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     let body = json!({
-                        "queues": Queue::list_queues(&connection)
+                        "queues": ::mq::queue::list_queues(&connection)
                     });
 
                     let res = create_response(
@@ -224,7 +227,7 @@ pub fn delete_queue(mut state: State) -> Box<HandlerFuture> {
                         path.name.clone()
                     };
 
-                    Queue::delete(name, &connection);
+                    delete(name, &connection);
 
                     let body = json!({
                         "msg": "Deleted."
@@ -264,8 +267,8 @@ pub fn push_messages_via_webhook(mut state: State) -> Box<HandlerFuture> {
                 let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
                 let mut message: Message = Message::new();
                 message.body = Some(body_content.to_string());
-                let q = Queue::get_queue(&name, &connection);
-                let id = Queue::post_message(q, message, &*connection).expect("Message put on queue.");
+                let q = get_queue(&name, &connection);
+                let id = post_message(q, message, &*connection).expect("Message put on queue.");
 
                 let body = json!({
                     "id": id,
@@ -306,7 +309,7 @@ pub fn get_queue_info(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     let queue_info;
-                    match Queue::get_queue_info(name, &connection) {
+                    match ::mq::queue::get_queue_info(name, &connection) {
                         Ok(res) => queue_info = res,
                         Err(err) => {
                             info!("Error: {:?}", err);
@@ -355,7 +358,7 @@ pub fn update_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let updated = Queue::update_subscribers(name, subscribers, &connection);
+                let updated = ::mq::queue::update_subscribers(name, subscribers, &connection);
                 let body;
                 if updated {
                     body = json!({
@@ -404,7 +407,7 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let updated = Queue::replace_subscribers(name, subscribers, &connection);
+                let updated = ::mq::queue::replace_subscribers(name, subscribers, &connection);
                 let body;
                 if updated {
                     body = json!({
@@ -453,7 +456,7 @@ pub fn delete_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let updated = Queue::delete_subscribers(name, subscribers, &connection);
+                let updated = ::mq::queue::delete_subscribers(name, subscribers, &connection);
                 let body;
                 if updated {
                     body = json!({

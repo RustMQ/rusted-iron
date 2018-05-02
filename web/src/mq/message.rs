@@ -5,9 +5,10 @@ use std::collections::{HashMap};
 use objectid::{ObjectId};
 use redis::*;
 use api::message::MessageDeleteBodyRequest;
-use mq::queue::Queue;
+use mq::queue::*;
 use queue::{
     message::PushMessage,
+    queue::Queue,
     queue_info::{QueueInfo, QueueType}
 };
 
@@ -73,7 +74,7 @@ impl Message {
         queue_unreserved_key.push_str(&queue_key.clone());
         queue_unreserved_key.push_str(":unreserved:msg");
 
-        let msg_counter_key = Queue::get_message_counter_key(&queue_name);
+        let msg_counter_key = get_message_counter_key(&queue_name);
         let mut msg_key = String::new();
         msg_key.push_str(&queue_key);
         msg_key.push_str(":msg:");
