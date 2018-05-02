@@ -25,7 +25,6 @@ use mq::{
     queue::*
 };
 use queue::{
-    queue::{Queue},
     queue_info::{QueueInfo, QueueSubscriber}
 };
 

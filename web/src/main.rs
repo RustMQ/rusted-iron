@@ -76,63 +76,64 @@ fn router(pool: Pool) -> Router {
             route.get("/version").to(api::redis::version);
         });
 
-        route.get("/queues").to(api::queue::list_queues);
+        route.scope("/3/projects/:project_id", |route| {
+            route.get("/queues").to(api::queue::list_queues);
+            route.scope("/queues/:name", |route| {
+                route.put("")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::put_queue);
+                route.get("")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::get_queue_info);
+                route
+                    .post("/messages")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::push_messages);
+                route
+                    .post("/reservations")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::reserve_messages);
+                route.delete("")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::delete_queue);
 
-        route.scope("/queues/:name", |route| {
-            route.put("")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::queue::put_queue);
-            route.get("")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::queue::get_queue_info);
-            route
-                .post("/messages")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::queue::push_messages);
-            route
-                .post("/reservations")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::queue::reserve_messages);
-            route.delete("")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::queue::delete_queue);
+                route.delete("/messages/:message_id")
+                    .with_path_extractor::<MessagePathExtractor>()
+                    .to(api::message::delete);
+                route.delete("/messages")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::message::delete_messages);
 
-            route.delete("/messages/:message_id")
-                .with_path_extractor::<MessagePathExtractor>()
-                .to(api::message::delete);
-            route.delete("/messages")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::message::delete_messages);
+                route.post("/webhook")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::push_messages_via_webhook);
 
-            route.post("/webhook")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::queue::push_messages_via_webhook);
+                route.get("/messages/:message_id")
+                    .with_path_extractor::<MessagePathExtractor>()
+                    .to(api::message::get_message);
 
-            route.get("/messages/:message_id")
-                .with_path_extractor::<MessagePathExtractor>()
-                .to(api::message::get_message);
+                route.post("/messages/:message_id/touch")
+                    .with_path_extractor::<MessagePathExtractor>()
+                    .to(api::message::touch_message);
 
-            route.post("/messages/:message_id/touch")
-                .with_path_extractor::<MessagePathExtractor>()
-                .to(api::message::touch_message);
+                route.get("/messages")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .with_query_string_extractor::<QueryStringExtractor>()
+                    .to(api::message::peek_messages);
 
-            route.get("/messages")
-                .with_path_extractor::<QueuePathExtractor>()
-                .with_query_string_extractor::<QueryStringExtractor>()
-                .to(api::message::peek_messages);
-
-            route.post("/messages/:message_id/release")
-                .with_path_extractor::<MessagePathExtractor>()
-                .to(api::message::release_message);
-            route.post("/subscribers")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::queue::update_subscribers);
-            route.put("/subscribers")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::queue::replace_subscribers);
-            route.delete("/subscribers")
-                .with_path_extractor::<QueuePathExtractor>()
-                .to(api::queue::delete_subscribers);
+                route.post("/messages/:message_id/release")
+                    .with_path_extractor::<MessagePathExtractor>()
+                    .to(api::message::release_message);
+                route.post("/subscribers")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::update_subscribers);
+                route.put("/subscribers")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::replace_subscribers);
+                route.delete("/subscribers")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::delete_subscribers);
+            });
         });
     })
 }
