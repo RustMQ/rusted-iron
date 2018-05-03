@@ -1,3 +1,5 @@
+extern crate mime;
+
 use std::env;
 use futures::{future, Future};
 use hyper::{
@@ -21,6 +23,8 @@ use gotham::{
 };
 use middleware::redis::RedisPool;
 use auth::is_authenticated;
+use api::queue::QueuePathExtractor;
+use project::is_project_exists;
 
 #[derive(StateData, Debug)]
 pub struct AuthMiddlewareData {
@@ -97,10 +101,34 @@ impl Middleware for AuthMiddleware {
                 connection
             };
 
+            // check user/password
             let is_authenticated = is_authenticated(&auth, &connection);
+            // check project
+            let project_id = {
+                let path = QueuePathExtractor::try_borrow_from(&state);
+                path.unwrap().project_id.clone()
+            };
+            let is_project_exists = match is_project_exists(project_id, &connection) {
+                Ok(v) => v,
+                Err(e) => {
+                    info!("Err: {:#?}", e);
+                    false
+                }
+            };
 
-            if !is_authenticated {
-                let res = create_response(&state, StatusCode::Unauthorized, None);
+            if !is_authenticated || !is_project_exists {
+                let body = json!({
+                    "msg": "Invalid project/token combination"
+                });
+
+                let res = create_response(
+                    &state,
+                    StatusCode::Unauthorized,
+                    Some((
+                        body.to_string().into_bytes(),
+                        mime::APPLICATION_JSON
+                    ))
+                );
                 return Box::new(future::ok((state, res)))
             }
 

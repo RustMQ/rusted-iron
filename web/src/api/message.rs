@@ -87,7 +87,7 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
 
                     let queue_name = {
                         let path = QueuePathExtractor::borrow_from(&state);
-                        path.name.clone()
+                        path.name.clone().unwrap()
                     };
 
                     let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
@@ -216,7 +216,7 @@ pub fn peek_messages(mut state: State) -> Box<HandlerFuture> {
 
                     let queue_name: String = {
                         let path = QueuePathExtractor::borrow_from(&state);
-                        path.name.clone()
+                        path.name.clone().unwrap()
                     };
 
                     let n: i32 = {

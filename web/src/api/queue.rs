@@ -28,9 +28,10 @@ use queue::{
     queue_info::{QueueInfo, QueueSubscriber}
 };
 
-#[derive(Deserialize, StateData, StaticResponseExtender)]
+#[derive(Debug, Deserialize, StateData, StaticResponseExtender)]
 pub struct QueuePathExtractor {
-    pub name: String,
+    pub project_id: String,
+    pub name: Option<String>,
 }
 
 pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
@@ -45,7 +46,7 @@ pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
                 };
                 let name: String = {
                     let path = QueuePathExtractor::borrow_from(&state);
-                    path.name.clone()
+                    path.name.clone().unwrap()
                 };
 
                 let body_content = String::from_utf8(_valid_body.to_vec()).unwrap();
@@ -88,7 +89,7 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                     };
                     let name: String = {
                         let path = QueuePathExtractor::borrow_from(&state);
-                        path.name.clone()
+                        path.name.clone().unwrap()
                     };
 
                     let mut messages: Vec<Message> = {
@@ -145,7 +146,7 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
                     };
                     let name: String = {
                         let path = QueuePathExtractor::borrow_from(&state);
-                        path.name.clone()
+                        path.name.clone().unwrap()
                     };
 
                     let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
@@ -223,7 +224,7 @@ pub fn delete_queue(mut state: State) -> Box<HandlerFuture> {
 
                     let name: String = {
                         let path = QueuePathExtractor::borrow_from(&state);
-                        path.name.clone()
+                        path.name.clone().unwrap()
                     };
 
                     delete(name, &connection);
@@ -261,7 +262,7 @@ pub fn push_messages_via_webhook(mut state: State) -> Box<HandlerFuture> {
                 };
                 let name: String = {
                     let path = QueuePathExtractor::borrow_from(&state);
-                    path.name.clone()
+                    path.name.clone().unwrap()
                 };
                 let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
                 let mut message: Message = Message::new();
@@ -304,7 +305,7 @@ pub fn get_queue_info(mut state: State) -> Box<HandlerFuture> {
 
                     let name: String = {
                         let path = QueuePathExtractor::borrow_from(&state);
-                        path.name.clone()
+                        path.name.clone().unwrap()
                     };
 
                     let queue_info;
@@ -349,7 +350,7 @@ pub fn update_subscribers(mut state: State) -> Box<HandlerFuture> {
                 };
                 let name: String = {
                     let path = QueuePathExtractor::borrow_from(&state);
-                    path.name.clone()
+                    path.name.clone().unwrap()
                 };
 
                 let mut subscribers: Vec<QueueSubscriber> = {
@@ -398,7 +399,7 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                 };
                 let name: String = {
                     let path = QueuePathExtractor::borrow_from(&state);
-                    path.name.clone()
+                    path.name.clone().unwrap()
                 };
 
                 let mut subscribers: Vec<QueueSubscriber> = {
@@ -447,7 +448,7 @@ pub fn delete_subscribers(mut state: State) -> Box<HandlerFuture> {
                 };
                 let name: String = {
                     let path = QueuePathExtractor::borrow_from(&state);
-                    path.name.clone()
+                    path.name.clone().unwrap()
                 };
 
                 let mut subscribers: Vec<QueueSubscriber> = {
