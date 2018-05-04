@@ -91,6 +91,41 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
+                    if body_content["ids"].is_null() {
+                        match Message::clear_messages(&queue_name, &connection) {
+                            Ok(_res) => {
+                                let body = json!({
+                                  "msg": "Cleared"
+                                });
+                                let res = create_response(
+                                    &state,
+                                    StatusCode::Ok,
+                                    Some((
+                                        body.to_string().into_bytes(),
+                                        mime::APPLICATION_JSON
+                                    ))
+                                );
+
+                                return future::ok((state, res));
+                            },
+                            Err(err) => {
+                                let body = json!({
+                                  "msg": err.to_string()
+                                });
+                                let res = create_response(
+                                    &state,
+                                    StatusCode::InternalServerError,
+                                    Some((
+                                        body.to_string().into_bytes(),
+                                        mime::APPLICATION_JSON
+                                    ))
+                                );
+
+                                return future::ok((state, res));
+                            }
+                        };
+                    }
+
                     let messages: Vec<MessageDeleteBodyRequest> = serde_json::from_value(body_content["ids"].clone()).unwrap();
 
                     Message::delete_messages(queue_name, &messages, &connection);

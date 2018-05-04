@@ -11,6 +11,7 @@ use queue::{
     queue::Queue,
     queue_info::{QueueInfo, QueueType}
 };
+use failure::Error;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
@@ -376,5 +377,41 @@ impl Message {
         } else {
             return false
         }
+    }
+
+    pub fn clear_messages(queue_name: &String, con: &Connection) -> Result<bool, Error> {
+        let mut queue_key = String::new();
+        queue_key.push_str("queue:");
+        queue_key.push_str(&queue_name);
+
+        let mut queue_msg_counter_key = String::new();
+        queue_msg_counter_key.push_str(&queue_key.clone());
+        queue_msg_counter_key.push_str(":msg:counter");
+
+        let mut queue_unreserved_key = String::new();
+        queue_unreserved_key.push_str(&queue_key.clone());
+        queue_unreserved_key.push_str(":unreserved:msg");
+
+        let mut queue_reserved_key = String::new();
+        queue_reserved_key.push_str(&queue_key.clone());
+        queue_reserved_key.push_str(":reserved:msg");
+
+        let mut match_queue_key = String::new();
+        match_queue_key.push_str(&queue_key.clone());
+        match_queue_key.push_str(":msg*");
+
+        let iter : Iter<String> = cmd("SCAN").cursor_arg(0).arg("MATCH").arg(match_queue_key).iter(con).unwrap();
+        for key in iter {
+            info!("DK: {:?}", key);
+            if queue_msg_counter_key == key {
+                continue;
+            }
+            let _: () = cmd("DEL").arg(key).query(con).unwrap();
+        }
+
+        let _ : () = con.del(queue_unreserved_key)?;
+        let _ : () = con.del(queue_reserved_key)?;
+
+        Ok(true)
     }
 }
