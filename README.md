@@ -23,15 +23,6 @@ $ docker push registry.heroku.com/<app>/<process-type>                          
 
 
 ### Local testing
-#### Redis setup
-For local testing you have to setup redis:
-```
-$ docker run --name rust-redis -v <path>:/data -p 6379:6379 -d redis redis-server --appendonly yes
-```
-Then you can connect to database via CLI:
-```
-$ docker run -it --link rust-redis:redis --rm redis redis-cli -h redis -p 6379
-```
 #### Running containers
 `Dockerfile` contains environment variables.
 When running a Docker container locally, you can set an environment variable using the `-e` flag or `--env-file`.
@@ -48,8 +39,7 @@ SERVICE_TOKEN=<service_token>
 
 After this preparation you can run containers:
 ```
-$ docker run -it --rm --link rust-redis:rust-redis --env-file ./env.list --name rusted-iron-web -p 8000:8000 rusted-iron/web:latest
-$ docker run -it --rm --link rust-redis:rust-redis --env-file ./env.list --name rusted-iron-pusher -p 8080:8080 rusted-iron/pusher:latest
+$ docker-compose up -d
 ```
 
 ### Redis in development
