@@ -13,17 +13,9 @@ use gotham::{
         FromState, State
     }
 };
-
 use middleware::redis::RedisPool;
-
 use api::queue::QueuePathExtractor;
 use mq::message::{Message, MAXIMUM_NUMBER_TO_PEEK};
-
-#[derive(Debug, Deserialize, StateData, StaticResponseExtender)]
-pub struct MessagePathExtractor {
-    name: String,
-    message_id: String
-}
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueryStringExtractor {
@@ -42,11 +34,11 @@ pub fn delete(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     let (queue_name, message_id): (String, String) = {
-                        let path = MessagePathExtractor::borrow_from(&state);
-                        (path.name.clone(), path.message_id.clone())
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        (path.name.clone().unwrap(), path.message_id.clone().unwrap())
                     };
 
-                    Message::delete(queue_name, message_id, &connection);
+                    ::mq::message::delete(queue_name, message_id, &connection);
 
                     let body = json!({
                         "msg": "Deleted"
@@ -92,7 +84,7 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
 
                     let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
                     if body_content["ids"].is_null() {
-                        match Message::clear_messages(&queue_name, &connection) {
+                        match ::mq::message::clear_messages(&queue_name, &connection) {
                             Ok(_res) => {
                                 let body = json!({
                                   "msg": "Cleared"
@@ -128,7 +120,7 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
 
                     let messages: Vec<MessageDeleteBodyRequest> = serde_json::from_value(body_content["ids"].clone()).unwrap();
 
-                    Message::delete_messages(queue_name, &messages, &connection);
+                    ::mq::message::delete_messages(queue_name, &messages, &connection);
 
                     let body = json!({
                         "msg": "Deleted"
@@ -163,11 +155,11 @@ pub fn get_message(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     let (queue_name, message_id): (String, String) = {
-                        let path = MessagePathExtractor::borrow_from(&state);
-                        (path.name.clone(), path.message_id.clone())
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        (path.name.clone().unwrap(), path.message_id.clone().unwrap())
                     };
 
-                    let msg: Message = Message::get_message(&queue_name, &message_id, &connection);
+                    let msg: Message = ::mq::message::get_message(&queue_name, &message_id, &connection);
 
                     let body = json!({
                         "message": msg
@@ -202,14 +194,14 @@ pub fn touch_message(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     let (queue_name, message_id): (String, String) = {
-                        let path = MessagePathExtractor::borrow_from(&state);
-                        (path.name.clone(), path.message_id.clone())
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        (path.name.clone().unwrap(), path.message_id.clone().unwrap())
                     };
 
                     let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
                     let old_reservation_id: String = serde_json::from_value(body_content["reservation_id"].clone()).unwrap();
 
-                    let reservation_id: String = Message::touch_message(&queue_name, &message_id, &old_reservation_id, &connection);
+                    let reservation_id: String = ::mq::message::touch_message(&queue_name, &message_id, &old_reservation_id, &connection);
 
                     if reservation_id.is_empty() {
                         let res = create_response(&state, StatusCode::NotFound, None);
@@ -263,7 +255,7 @@ pub fn peek_messages(mut state: State) -> Box<HandlerFuture> {
                         }
                     };
 
-                    let msgs: Vec<Message> = Message::peek_messages(&queue_name, &n, &connection);
+                    let msgs: Vec<Message> = ::mq::message::peek_messages(&queue_name, &n, &connection);
 
                     let body = json!({
                         "messages": msgs
@@ -299,14 +291,14 @@ pub fn release_message(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     let (queue_name, message_id): (String, String) = {
-                        let path = MessagePathExtractor::borrow_from(&state);
-                        (path.name.clone(), path.message_id.clone())
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        (path.name.clone().unwrap(), path.message_id.clone().unwrap())
                     };
 
                     let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
                     let reservation_id: String = serde_json::from_value(body_content["reservation_id"].clone()).unwrap();
 
-                    let released = Message::release_message(&queue_name, &message_id, &reservation_id, &connection);
+                    let released = ::mq::message::release_message(&queue_name, &message_id, &reservation_id, &connection);
 
                     if !released {
                         let res = create_response(&state, StatusCode::NotFound, None);

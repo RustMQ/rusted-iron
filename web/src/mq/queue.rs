@@ -3,7 +3,10 @@ extern crate serde_json;
 use chrono::prelude::*;
 use redis::*;
 use serde_redis::RedisDeserialize;
-use mq::message::Message;
+use mq::message::{
+    Message,
+    push_message
+};
 use queue::{
     queue::{Queue, QueueLite},
     queue_info::{
@@ -54,7 +57,7 @@ pub fn get_message_counter_key(queue_id: &String) -> String {
 }
 
 pub fn post_message(queue: Queue, message: Message, con: &Connection) -> Result<i32, Error> {
-    Ok(Message::push_message(queue.clone(), message, con))
+    Ok(push_message(queue.clone(), message, con))
 }
 
 pub fn create_queue(queue_name: String, con: &Connection) -> Queue {

@@ -14,9 +14,7 @@ use gotham::{
     }
 };
 use serde_json::Value;
-
 use middleware::redis::RedisPool;
-
 use mq::{
     message::{
         Message,
@@ -32,6 +30,7 @@ use queue::{
 pub struct QueuePathExtractor {
     pub project_id: String,
     pub name: Option<String>,
+    pub message_id: Option<String>
 }
 
 pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
@@ -155,7 +154,7 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
                         reserve_params.delete = Some(false)
                     }
 
-                    Message::reserve_messages(&name, &reserve_params, &connection)
+                    ::mq::message::reserve_messages(&name, &reserve_params, &connection)
                 };
 
                 let body = json!({

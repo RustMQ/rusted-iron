@@ -42,7 +42,6 @@ use gotham::{
     },
     pipeline::{
         new_pipeline,
-        single::single_pipeline,
         set::{finalize_pipeline_set, new_pipeline_set}
     }
 };
@@ -56,7 +55,6 @@ use middleware::{
 use api::{
     queue::QueuePathExtractor,
     message::{
-        MessagePathExtractor,
         QueryStringExtractor
     }
 };
@@ -116,7 +114,7 @@ fn router(pool: Pool) -> Router {
                         .to(api::queue::delete_queue);
 
                     route.delete("/messages/:message_id")
-                        .with_path_extractor::<MessagePathExtractor>()
+                        .with_path_extractor::<QueuePathExtractor>()
                         .to(api::message::delete);
                     route.delete("/messages")
                         .with_path_extractor::<QueuePathExtractor>()
@@ -127,11 +125,11 @@ fn router(pool: Pool) -> Router {
                         .to(api::queue::push_messages_via_webhook);
 
                     route.get("/messages/:message_id")
-                        .with_path_extractor::<MessagePathExtractor>()
+                        .with_path_extractor::<QueuePathExtractor>()
                         .to(api::message::get_message);
 
                     route.post("/messages/:message_id/touch")
-                        .with_path_extractor::<MessagePathExtractor>()
+                        .with_path_extractor::<QueuePathExtractor>()
                         .to(api::message::touch_message);
 
                     route.get("/messages")
@@ -140,7 +138,7 @@ fn router(pool: Pool) -> Router {
                         .to(api::message::peek_messages);
 
                     route.post("/messages/:message_id/release")
-                        .with_path_extractor::<MessagePathExtractor>()
+                        .with_path_extractor::<QueuePathExtractor>()
                         .to(api::message::release_message);
                     route.post("/subscribers")
                         .with_path_extractor::<QueuePathExtractor>()
