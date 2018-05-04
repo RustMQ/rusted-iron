@@ -6,8 +6,6 @@ ADD ./queue/Cargo.toml Cargo.toml
 
 ADD ./queue/src src
 
-RUN cargo build --release
-
 WORKDIR /usr/src/pusher
 
 ADD ./pusher/Cargo.toml Cargo.toml
