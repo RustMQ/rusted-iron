@@ -10,7 +10,7 @@ pub enum QueueType {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct QueueInfo {
-    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")] pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")] pub project_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")] pub message_timeout: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")] pub message_expiration: Option<u32>,
@@ -26,7 +26,7 @@ pub struct QueueInfo {
 impl QueueInfo {
     pub fn new(name: String) -> QueueInfo {
         QueueInfo {
-            name,
+            name: Some(name),
             project_id: None,
             message_timeout: None,
             message_expiration: None,
@@ -40,7 +40,7 @@ impl QueueInfo {
 
     pub fn default(name: String) -> QueueInfo {
         QueueInfo {
-            name,
+            name: Some(name),
             project_id: None,
             message_timeout: Some(60),
             message_expiration: Some(604800),
@@ -53,7 +53,7 @@ impl QueueInfo {
     }
 
     pub fn name(&mut self, name: String) -> &mut QueueInfo {
-        self.name = name;
+        self.name = Some(name);
 
         self
     }
