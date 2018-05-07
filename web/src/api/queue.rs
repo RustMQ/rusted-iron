@@ -43,16 +43,22 @@ pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
                     let connection = redis_pool.conn().unwrap();
                     connection
                 };
-                let name: String = {
+                let (project_id, name) = {
                     let path = QueuePathExtractor::borrow_from(&state);
-                    path.name.clone().unwrap()
+                    (path.project_id.clone(), path.name.clone().unwrap())
                 };
 
                 let body_content = String::from_utf8(_valid_body.to_vec()).unwrap();
                 let v: Value = serde_json::from_str(&body_content).unwrap();
-                let q: QueueInfo = serde_json::from_value(v["queue"].clone()).unwrap();
+                let q: QueueInfo;
+                if v["queue"].is_null() {
+                    q = QueueInfo::default(name);
+                } else {
+                    q = serde_json::from_value(v["queue"].clone()).unwrap();
+                }
 
-                let queue = create_queue2(q, &connection);
+                let mut queue = create_queue2(q, &connection);
+                queue.project_id = Some(project_id);
 
                 let body = json!({
                     "queue": queue

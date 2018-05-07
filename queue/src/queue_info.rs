@@ -38,6 +38,20 @@ impl QueueInfo {
         }
     }
 
+    pub fn default(name: String) -> QueueInfo {
+        QueueInfo {
+            name,
+            project_id: None,
+            message_timeout: Some(60),
+            message_expiration: Some(604800),
+            queue_type: Some(QueueType::Pull),
+            size: None,
+            total_messages: None,
+            push: None,
+            alerts: None,
+        }
+    }
+
     pub fn name(&mut self, name: String) -> &mut QueueInfo {
         self.name = name;
 
