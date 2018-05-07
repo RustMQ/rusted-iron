@@ -98,6 +98,9 @@ fn router(pool: Pool) -> Router {
                     route.put("")
                         .with_path_extractor::<QueuePathExtractor>()
                         .to(api::queue::put_queue);
+                    route.patch("")
+                        .with_path_extractor::<QueuePathExtractor>()
+                        .to(api::queue::update_queue);
                     route.get("")
                         .with_path_extractor::<QueuePathExtractor>()
                         .to(api::queue::get_queue_info);

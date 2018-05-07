@@ -102,7 +102,7 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                         serde_json::from_value(body_content["messages"].clone()).unwrap()
                     };
 
-                    let q = get_queue(&name, &connection);
+                    let q = get_queue(&name, &connection).unwrap();
                     let mut result: Vec<String> = messages
                         .into_iter()
                         .map(|msg| {
@@ -272,7 +272,7 @@ pub fn push_messages_via_webhook(mut state: State) -> Box<HandlerFuture> {
                 let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
                 let mut message: Message = Message::new();
                 message.body = Some(body_content.to_string());
-                let q = get_queue(&name, &connection);
+                let q = get_queue(&name, &connection).unwrap();
                 let id = post_message(q, message, &*connection).expect("Message put on queue.");
 
                 let body = json!({
@@ -488,4 +488,82 @@ pub fn delete_subscribers(mut state: State) -> Box<HandlerFuture> {
         });
 
     Box::new(f)
+}
+
+pub fn update_queue(mut state: State) -> Box<HandlerFuture> {
+    let f = Body::take_from(&mut state)
+        .concat2()
+        .then(|full_body| match full_body {
+            Ok(_valid_body) => {
+                let connection = {
+                    let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                    let connection = redis_pool.conn().unwrap();
+                    connection
+                };
+                let (project_id, name) = {
+                    let path = QueuePathExtractor::borrow_from(&state);
+                    (path.project_id.clone(), path.name.clone().unwrap())
+                };
+
+                let body_content = String::from_utf8(_valid_body.to_vec()).unwrap();
+                let v: Value = serde_json::from_str(&body_content).unwrap();
+
+                let current_queue_info = ::mq::queue::get_queue_info(name, &connection);
+                if current_queue_info.is_err() {
+                    let body = json!({
+                        "msg": "Queue not found"
+                    });
+
+                    let res = create_response(
+                        &state,
+                        StatusCode::NotFound,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        )),
+                    );
+
+                    return future::ok((state, res))
+                }
+
+                if v["queue"].is_null() {
+                    let mut res_q = current_queue_info.unwrap().clone();
+                    res_q.project_id = Some(project_id);
+
+                    let body = json!({
+                        "queue": res_q
+                    });
+
+                    let res = create_response(
+                        &state,
+                        StatusCode::Ok,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        )),
+                    );
+
+                    return future::ok((state, res))
+                }
+
+                let new_queue_info: QueueInfo = serde_json::from_value(v["queue"].clone()).unwrap();
+
+                let body = json!({
+                });
+
+                let res = create_response(
+                    &state,
+                    StatusCode::Ok,
+                    Some((
+                        body.to_string().into_bytes(),
+                        mime::APPLICATION_JSON
+                    )),
+                );
+
+                future::ok((state, res))
+            },
+            Err(e) => future::err((state, e.into_handler_error()))
+        });
+
+        Box::new(f)
 }

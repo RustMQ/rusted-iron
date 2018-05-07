@@ -30,7 +30,9 @@ pub fn list_queues(con: &Connection) -> Vec<QueueLite> {
     res
 }
 
-pub fn get_queue(queue_name: &String, con: &Connection) -> Queue {
+pub fn get_queue(queue_name: &String, con: &Connection) -> Result<Queue, Error> {
+    ensure!(queue_name.trim().is_empty(), "Queue not found");
+
     let queue_key = Queue::get_queue_key(queue_name);
     let v: Result<Value, RedisError> = con.hgetall(queue_key);
 
@@ -44,7 +46,7 @@ pub fn get_queue(queue_name: &String, con: &Connection) -> Queue {
         },
     };
 
-    result
+    Ok(result)
 }
 
 pub fn get_message_counter_key(queue_id: &String) -> String {
@@ -134,13 +136,14 @@ pub fn delete(queue_name: String, con: &Connection) -> bool {
 }
 
 pub fn get_queue_info(queue_name: String, con: &Connection) -> Result<QueueInfo, Error> {
-    let queue = get_queue(&queue_name, con);
+    let queue = get_queue(&queue_name, con)?;
     let queue_info_as_str = match queue.value {
         Some(v) => v,
         None => String::new()
     };
 
     let queue_info: QueueInfo = serde_json::from_str(&queue_info_as_str).unwrap();
+
     return Ok(queue_info);
 }
 
