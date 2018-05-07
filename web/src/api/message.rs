@@ -248,7 +248,6 @@ pub fn peek_messages(mut state: State) -> Box<HandlerFuture> {
 
                     let n: i32 = {
                         let path = QueryStringExtractor::borrow_from(&state);
-                        debug!("I'm here");
                         match path.n {
                             Some(n) => n,
                             None => MAXIMUM_NUMBER_TO_PEEK,
