@@ -31,7 +31,7 @@ pub fn list_queues(con: &Connection) -> Vec<QueueLite> {
 }
 
 pub fn get_queue(queue_name: &String, con: &Connection) -> Result<Queue, Error> {
-    ensure!(queue_name.trim().is_empty(), "Queue not found");
+    ensure!(!queue_name.trim().is_empty(), "Queue not found");
 
     let queue_key = Queue::get_queue_key(queue_name);
     let v: Result<Value, RedisError> = con.hgetall(queue_key);
@@ -91,13 +91,14 @@ pub fn create_queue(queue_name: String, con: &Connection) -> Queue {
 pub fn create_queue2(queue_info: QueueInfo, con: &Connection) -> QueueInfo {
     let mut queue_key = String::new();
     queue_key.push_str("queue:");
-    queue_key.push_str(&queue_info.name);
+    let queue_name = queue_info.name.clone().unwrap();
+    queue_key.push_str(&queue_name);
     let now: DateTime<Utc> = Utc::now();
     let mut pipe = pipe();
-    pipe.cmd("SADD").arg("queues".to_string()).arg(&queue_info.name).ignore();
+    pipe.cmd("SADD").arg("queues".to_string()).arg(&queue_name).ignore();
     pipe.cmd("HMSET").arg(&queue_key)
         .arg("name".to_string())
-        .arg(&queue_info.name)
+        .arg(&queue_name)
         .arg("value".to_string())
         .arg(serde_json::to_string(&queue_info).unwrap())
         .arg("created_at".to_string())
@@ -189,13 +190,13 @@ pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubs
 pub fn update_queue_info(queue_info: QueueInfo, con: &Connection) -> bool {
     let mut queue_key = String::new();
     queue_key.push_str("queue:");
-    queue_key.push_str(&queue_info.name);
+    queue_key.push_str(queue_info.name.clone().unwrap().as_str());
+
     let _: () = cmd("HSET")
         .arg(queue_key)
         .arg("value")
         .arg(serde_json::to_string(&queue_info).unwrap())
         .query(con).unwrap();
-
 
     true
 }
@@ -246,4 +247,21 @@ pub fn delete_subscribers(queue_name: String, subscribers_for_delete: Vec<QueueS
         .collect();
 
     replace_subscribers(queue_name, subscribers_for_update, con)
+}
+
+pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &Connection) -> Result<QueueInfo, Error> {
+    let mut current_queue_info = get_queue_info(queue_name.clone(), &con)?;
+    info!("PATCH QUEUE: {:#?}", queue_info_patch);
+
+    if queue_info_patch.message_timeout.is_some() {
+        current_queue_info.message_timeout = queue_info_patch.message_timeout;
+    }
+    if queue_info_patch.message_expiration.is_some() {
+        current_queue_info.message_expiration = queue_info_patch.message_expiration;
+    }
+
+    info!("CQI: {:#?}", current_queue_info);
+    update_queue_info(current_queue_info.clone(), con);
+
+    Ok(current_queue_info)
 }

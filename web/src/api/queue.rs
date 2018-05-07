@@ -20,7 +20,7 @@ use mq::{
         Message,
         ReserveMessageParams
     },
-    queue::*
+    queue::{create_queue2, delete, get_queue, post_message, patch_queue_info}
 };
 use queue::{
     queue_info::{QueueInfo, QueueSubscriber}
@@ -505,10 +505,7 @@ pub fn update_queue(mut state: State) -> Box<HandlerFuture> {
                     (path.project_id.clone(), path.name.clone().unwrap())
                 };
 
-                let body_content = String::from_utf8(_valid_body.to_vec()).unwrap();
-                let v: Value = serde_json::from_str(&body_content).unwrap();
-
-                let current_queue_info = ::mq::queue::get_queue_info(name, &connection);
+                let current_queue_info = ::mq::queue::get_queue_info(name.clone(), &connection);
                 if current_queue_info.is_err() {
                     let body = json!({
                         "msg": "Queue not found"
@@ -525,6 +522,9 @@ pub fn update_queue(mut state: State) -> Box<HandlerFuture> {
 
                     return future::ok((state, res))
                 }
+
+                let body_content = String::from_utf8(_valid_body.to_vec()).unwrap();
+                let v: Value = serde_json::from_str(&body_content).unwrap();
 
                 if v["queue"].is_null() {
                     let mut res_q = current_queue_info.unwrap().clone();
@@ -548,12 +548,33 @@ pub fn update_queue(mut state: State) -> Box<HandlerFuture> {
 
                 let new_queue_info: QueueInfo = serde_json::from_value(v["queue"].clone()).unwrap();
 
-                let body = json!({
-                });
+                let updated_queue_info_res = patch_queue_info(name.clone(), new_queue_info, &connection);
+                if updated_queue_info_res.is_ok() {
+                    let mut updated_queue_info = updated_queue_info_res.unwrap();
+                    updated_queue_info.project_id = Some(project_id);
+
+                    let body = json!({
+                        "queue": updated_queue_info
+                    });
+
+                    let res = create_response(
+                        &state,
+                        StatusCode::Ok,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        )),
+                    );
+
+                    return future::ok((state, res))
+                }
+
+
+                let body = json!({});
 
                 let res = create_response(
                     &state,
-                    StatusCode::Ok,
+                    StatusCode::NotFound,
                     Some((
                         body.to_string().into_bytes(),
                         mime::APPLICATION_JSON
