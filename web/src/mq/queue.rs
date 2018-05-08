@@ -239,7 +239,39 @@ pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &C
         bail!("Queue type cannot be changed")
     }
 
-    info!("CQI: {:#?}", current_queue_info);
+    if current_queue_info.queue_type == Some(QueueType::Unicast) || current_queue_info.queue_type == Some(QueueType::Multicast) {
+        let mut new_push = PushInfo {
+            retries_delay: None,
+            retries: None,
+            subscribers: None,
+            error_queue: None
+        };
+        if queue_info_patch.push.is_some() {
+            let current_push = current_queue_info.push.unwrap();
+            let push = queue_info_patch.push.unwrap();
+            if push.retries.is_some() {
+                new_push.retries = push.retries;
+            } else {
+                new_push.retries = current_push.retries;
+            }
+            if push.retries_delay.is_some() {
+                new_push.retries_delay = push.retries_delay;
+            } else {
+                new_push.retries_delay = current_push.retries_delay;
+            }
+            if push.subscribers.is_none() {
+                new_push.subscribers = current_push.subscribers;
+            }
+            if push.error_queue.is_some() {
+                let qi = QueueInfo::new(push.error_queue.unwrap());
+                let _ = create_queue(qi, con);
+            } else {
+                new_push.error_queue = current_push.error_queue;
+            }
+            current_queue_info.push = Some(new_push);
+        }
+    }
+
     update_queue_info(current_queue_info.clone(), con);
 
     Ok(current_queue_info)
