@@ -50,11 +50,12 @@ pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
 
                 let body_content = String::from_utf8(_valid_body.to_vec()).unwrap();
                 let v: Value = serde_json::from_str(&body_content).unwrap();
-                let q: QueueInfo;
+                let mut q: QueueInfo;
                 if v["queue"].is_null() {
                     q = QueueInfo::default(name);
                 } else {
                     q = serde_json::from_value(v["queue"].clone()).unwrap();
+                    q.name = Some(name);
                 }
 
                 let mut queue = create_queue(q, &connection);
