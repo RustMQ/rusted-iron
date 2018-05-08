@@ -259,14 +259,22 @@ pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &C
             } else {
                 new_push.retries_delay = current_push.retries_delay;
             }
-            if push.subscribers.is_none() {
-                new_push.subscribers = current_push.subscribers;
-            }
             if push.error_queue.is_some() {
-                let qi = QueueInfo::new(push.error_queue.unwrap());
-                let _ = create_queue(qi, con);
+                if current_push.error_queue != push.error_queue {
+                    let qi = QueueInfo::new(push.error_queue.unwrap());
+                    let _ = create_queue(qi, con);
+                }
             } else {
                 new_push.error_queue = current_push.error_queue;
+            }
+            if push.subscribers.is_some() {
+                if !update_subscribers(queue_name, push.subscribers.clone().unwrap(), con) {
+                    bail!("Bad request");
+                }
+
+                new_push.subscribers = push.subscribers;
+            } else {
+                new_push.subscribers = current_push.subscribers;
             }
             current_queue_info.push = Some(new_push);
         }
