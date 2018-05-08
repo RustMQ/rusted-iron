@@ -20,7 +20,7 @@ use mq::{
         Message,
         ReserveMessageParams
     },
-    queue::{create_queue2, delete, get_queue, post_message, patch_queue_info}
+    queue::{create_queue, delete, get_queue, post_message, patch_queue_info}
 };
 use queue::{
     queue_info::{QueueInfo, QueueSubscriber}
@@ -57,7 +57,7 @@ pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
                     q = serde_json::from_value(v["queue"].clone()).unwrap();
                 }
 
-                let mut queue = create_queue2(q, &connection);
+                let mut queue = create_queue(q, &connection);
                 queue.project_id = Some(project_id);
 
                 let body = json!({

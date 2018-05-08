@@ -1,7 +1,7 @@
 extern crate serde_json;
 
 use chrono::prelude::*;
-use redis::{Commands, Connection, Iter, PipelineCommands, RedisError, Value, cmd, pipe};
+use redis::{Commands, Connection, Iter, RedisError, Value, cmd, pipe};
 use serde_redis::RedisDeserialize;
 use mq::message::{
     Message,
@@ -63,33 +63,7 @@ pub fn post_message(queue: Queue, message: Message, con: &Connection) -> Result<
     Ok(push_message(queue.clone(), message, con))
 }
 
-pub fn create_queue(queue_name: String, con: &Connection) -> Queue {
-    let mut queue_key = String::new();
-    queue_key.push_str("queue:");
-    queue_key.push_str(&queue_name);
-    let mut pipe = pipe();
-    pipe.cmd("SADD").arg("queues".to_string()).arg(&queue_name).ignore();
-    pipe.cmd("HMSET").arg(&queue_key)
-        .arg("name".to_string())
-        .arg(&queue_name)
-        .arg("class".to_string())
-        .arg("pull".to_string())
-        .arg("totalrecv".to_string())
-        .arg(0)
-        .arg("totalsent".to_string())
-        .arg(0).ignore();
-    queue_key.push_str(":msg:counter");
-    let _: Vec<String> = pipe.cmd("SET").arg(queue_key).arg(0).query(con).unwrap();
-
-    Queue {
-        name: Some(queue_name),
-        value: Some("pull".to_string()),
-        totalrecv: Some(0),
-        totalsent: Some(0)
-    }
-}
-
-pub fn create_queue2(queue_info: QueueInfo, con: &Connection) -> QueueInfo {
+pub fn create_queue(queue_info: QueueInfo, con: &Connection) -> QueueInfo {
     let mut queue_key = String::new();
     queue_key.push_str("queue:");
     let queue_name = queue_info.name.clone().unwrap();
@@ -115,7 +89,7 @@ pub fn create_queue2(queue_info: QueueInfo, con: &Connection) -> QueueInfo {
         let push = queue_info.clone().push.unwrap();
         if !push.error_queue.is_none() {
             let qi = QueueInfo::new(push.error_queue.unwrap());
-            let _ = create_queue2(qi, con);
+            let _ = create_queue(qi, con);
         }
     }
 
