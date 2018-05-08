@@ -569,12 +569,15 @@ pub fn update_queue(mut state: State) -> Box<HandlerFuture> {
                     return future::ok((state, res))
                 }
 
+                let err = updated_queue_info_res.unwrap_err();
 
-                let body = json!({});
+                let body = json!({
+                    "msg": err.to_string()
+                });
 
                 let res = create_response(
                     &state,
-                    StatusCode::NotFound,
+                    StatusCode::Forbidden,
                     Some((
                         body.to_string().into_bytes(),
                         mime::APPLICATION_JSON

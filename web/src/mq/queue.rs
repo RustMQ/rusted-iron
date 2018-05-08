@@ -1,7 +1,7 @@
 extern crate serde_json;
 
 use chrono::prelude::*;
-use redis::*;
+use redis::{Commands, Connection, Iter, PipelineCommands, RedisError, Value, cmd, pipe};
 use serde_redis::RedisDeserialize;
 use mq::message::{
     Message,
@@ -13,6 +13,7 @@ use queue::{
         QueueInfo,
         QueueSubscriber,
         PushInfo,
+        QueueType
     }
 };
 use std::collections::HashMap;
@@ -154,7 +155,7 @@ pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubs
     let mut queue_info = queue_info_res.unwrap();
     match queue_info.clone().push {
         Some(push) => {
-            current_subscribers = push.subscribers;
+            current_subscribers = push.subscribers.unwrap();
         },
         None => {
             info!("Broken subscribers!");
@@ -175,7 +176,7 @@ pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubs
         let new_push = PushInfo {
                 retries_delay: push.retries_delay,
                 retries: push.retries,
-                subscribers: subscribers,
+                subscribers: Some(subscribers),
                 error_queue: push.error_queue
             };
 
@@ -210,7 +211,7 @@ pub fn replace_subscribers(queue_name: String, new_subscribers: Vec<QueueSubscri
         let new_push = PushInfo {
                 retries_delay: push.retries_delay,
                 retries: push.retries,
-                subscribers: new_subscribers,
+                subscribers: Some(new_subscribers),
                 error_queue: push.error_queue
         };
 
@@ -228,7 +229,7 @@ pub fn delete_subscribers(queue_name: String, subscribers_for_delete: Vec<QueueS
     let queue_info = queue_info_res.unwrap();
     match queue_info.clone().push {
         Some(push) => {
-            current_subscribers = push.subscribers;
+            current_subscribers = push.subscribers.unwrap();
         },
         None => {
             info!("Broken subscribers!");
@@ -258,6 +259,10 @@ pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &C
     }
     if queue_info_patch.message_expiration.is_some() {
         current_queue_info.message_expiration = queue_info_patch.message_expiration;
+    }
+
+    if current_queue_info.queue_type == Some(QueueType::Pull) && queue_info_patch.push.is_some() {
+        bail!("Queue type cannot be changed")
     }
 
     info!("CQI: {:#?}", current_queue_info);
