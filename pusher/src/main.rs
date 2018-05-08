@@ -57,7 +57,7 @@ fn main() {
                 let pm: PushMessage = serde_json::from_str(&payload).unwrap();
                 let retry: Retry = {
                     let (retry_count, retry_delay) = match pm.queue_info.push.clone() {
-                        Some(pi) => (pi.retries, pi.retries_delay),
+                        Some(pi) => (pi.retries.unwrap(), pi.retries_delay.unwrap()),
                         None => (0, 0)
                     };
                     Retry {
@@ -70,7 +70,7 @@ fn main() {
                     let push_info: Option<PushInfo> = pm.queue_info.push.clone();
                     let (subscribers, error_queue_name): (Vec<QueueSubscriber>, String) = match push_info {
                         Some(pi) => {
-                            (pi.subscribers, pi.error_queue.unwrap())
+                            (pi.subscribers.unwrap(), pi.error_queue.unwrap())
                         },
                         None => (Vec::new(), String::new()),
                     };

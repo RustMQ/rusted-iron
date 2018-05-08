@@ -91,9 +91,12 @@ impl QueueInfo {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PushInfo {
-    pub retries_delay: u32,
-    pub retries: u32,
-    pub subscribers: Vec<QueueSubscriber>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retries_delay: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retries: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subscribers: Option<Vec<QueueSubscriber>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_queue: Option<String>,
 }
