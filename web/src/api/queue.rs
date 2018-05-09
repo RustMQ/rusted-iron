@@ -244,22 +244,28 @@ pub fn delete_queue(mut state: State) -> Box<HandlerFuture> {
                         path.name.clone().unwrap()
                     };
 
-                    delete(name, &connection);
+                    match delete(name, &connection) {
+                        Ok(_deleted) => {
+                            let body = json!({
+                                "msg": "Deleted."
+                            });
 
-                    let body = json!({
-                        "msg": "Deleted."
-                    });
+                            let res = create_response(
+                                &state,
+                                StatusCode::Ok,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
 
-                    let res = create_response(
-                        &state,
-                        StatusCode::Ok,
-                        Some((
-                            body.to_string().into_bytes(),
-                            mime::APPLICATION_JSON
-                        ))
-                    );
-
-                    future::ok((state, res))
+                            return future::ok((state, res));
+                        },
+                        Err(_e) => {
+                            let res = create_response(&state, StatusCode::NotFound, None);
+                            return future::ok((state, res));
+                        }
+                    }
                 },
                 Err(e) => future::err((state, e.into_handler_error()))
             });
