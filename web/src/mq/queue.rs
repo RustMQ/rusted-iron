@@ -114,7 +114,7 @@ pub fn get_queue_info(queue_name: String, con: &Connection) -> Result<QueueInfo,
     return Ok(queue_info);
 }
 
-pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> bool {
+pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> Result<bool, Error> {
     let queue_info_res = get_queue_info(queue_name, con);
     let mut current_subscribers;
     let mut queue_info = queue_info_res.unwrap();
@@ -150,10 +150,10 @@ pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubs
         return update_queue_info(queue_info, con)
     }
 
-    false
+    Ok(false)
 }
 
-pub fn update_queue_info(queue_info: QueueInfo, con: &Connection) -> bool {
+pub fn update_queue_info(queue_info: QueueInfo, con: &Connection) -> Result<bool, Error> {
     let mut queue_key = String::new();
     queue_key.push_str("queue:");
     queue_key.push_str(queue_info.name.clone().unwrap().as_str());
@@ -162,12 +162,12 @@ pub fn update_queue_info(queue_info: QueueInfo, con: &Connection) -> bool {
         .arg(queue_key)
         .arg("value")
         .arg(serde_json::to_string(&queue_info).unwrap())
-        .query(con).unwrap();
+        .query(con)?;
 
-    true
+    Ok(true)
 }
 
-pub fn replace_subscribers(queue_name: String, new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> bool {
+pub fn replace_subscribers(queue_name: String, new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> Result<bool, Error> {
     let queue_info_res = get_queue_info(queue_name, con);
     let mut queue_info = queue_info_res.unwrap();
     if queue_info.push.is_some() {
@@ -185,10 +185,10 @@ pub fn replace_subscribers(queue_name: String, new_subscribers: Vec<QueueSubscri
         return update_queue_info(queue_info, con)
     }
 
-    false
+    Ok(false)
 }
 
-pub fn delete_subscribers(queue_name: String, subscribers_for_delete: Vec<QueueSubscriber>, con: &Connection) -> bool {
+pub fn delete_subscribers(queue_name: String, subscribers_for_delete: Vec<QueueSubscriber>, con: &Connection) -> Result<bool, Error> {
     let queue_info_res = get_queue_info(queue_name.clone(), con);
     let current_subscribers;
     let queue_info = queue_info_res.unwrap();
@@ -202,7 +202,7 @@ pub fn delete_subscribers(queue_name: String, subscribers_for_delete: Vec<QueueS
         },
     };
     if current_subscribers.len() == 1 {
-        return false;
+        return Ok(false);
     }
     let subscribers_for_delete_as_map: HashMap<_, _> = subscribers_for_delete.iter()
         .map(|s| (s.name.clone(), s))
@@ -259,7 +259,7 @@ pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &C
                 new_push.error_queue = current_push.error_queue;
             }
             if push.subscribers.is_some() {
-                if !update_subscribers(queue_name, push.subscribers.clone().unwrap(), con) {
+                if !update_subscribers(queue_name, push.subscribers.clone().unwrap(), con)? {
                     bail!("Bad request");
                 }
 

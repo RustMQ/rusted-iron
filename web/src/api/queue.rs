@@ -381,18 +381,24 @@ pub fn update_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let updated = ::mq::queue::update_subscribers(name, subscribers, &connection);
-                let body;
-                if updated {
-                    body = json!({
-                        "msg": String::from("Updated")
-                    });
+                let body = match ::mq::queue::update_subscribers(name, subscribers, &connection) {
+                    Ok(updated) => {
+                        if updated {
+                            json!({
+                                "msg": String::from("Updated")
+                            })
+                        } else {
+                            json!({
+                                "msg": String::from("Not Updated")
+                            })
+                        }
+                    },
+                    Err(_e) => {
+                        let res = create_response(&state, StatusCode::NotFound, None);
+                        return future::ok((state, res));
+                    }
+                };
 
-                } else {
-                    body = json!({
-                        "msg": String::from("Not Updated")
-                    });
-                }
                 let res = create_response(
                     &state,
                     StatusCode::Ok,
@@ -430,18 +436,25 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let updated = ::mq::queue::replace_subscribers(name, subscribers, &connection);
-                let body;
-                if updated {
-                    body = json!({
-                        "msg": String::from("Updated")
-                    });
 
-                } else {
-                    body = json!({
-                        "msg": String::from("Not Updated")
-                    });
-                }
+                let body = match ::mq::queue::replace_subscribers(name, subscribers, &connection) {
+                    Ok(updated) => {
+                        if updated {
+                            json!({
+                               "msg": String::from("Updated")
+                            })
+                        } else {
+                            json!({
+                                "msg": String::from("Not Updated")
+                            })
+                        }
+                    },
+                    Err(_e) => {
+                        let res = create_response(&state, StatusCode::NotFound, None);
+                        return future::ok((state, res));
+                    }
+                };
+
                 let res = create_response(
                     &state,
                     StatusCode::Ok,
@@ -479,18 +492,24 @@ pub fn delete_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let updated = ::mq::queue::delete_subscribers(name, subscribers, &connection);
-                let body;
-                if updated {
-                    body = json!({
-                        "msg": String::from("Updated")
-                    });
+                let body = match ::mq::queue::delete_subscribers(name, subscribers, &connection) {
+                    Ok(updated) => {
+                        if updated {
+                            json!({
+                                "msg": String::from("Updated")
+                            })
+                        } else {
+                            json!({
+                                "msg": String::from("Not Updated")
+                            })
+                        }
+                    },
+                    Err(_e) => {
+                        let res = create_response(&state, StatusCode::NotFound, None);
+                        return future::ok((state, res));
+                    }
+                };
 
-                } else {
-                    body = json!({
-                        "msg": String::from("Not Updated")
-                    });
-                }
                 let res = create_response(
                     &state,
                     StatusCode::Ok,
