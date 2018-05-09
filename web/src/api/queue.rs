@@ -198,20 +198,29 @@ pub fn list_queues(mut state: State) -> Box<HandlerFuture> {
                         connection
                     };
 
-                    let body = json!({
-                        "queues": ::mq::queue::list_queues(&connection)
-                    });
+                    match ::mq::queue::list_queues(&connection) {
+                        Ok(queues) => {
+                            let body = json!({
+                                "queues": queues
+                            });
 
-                    let res = create_response(
-                        &state,
-                        StatusCode::Ok,
-                        Some((
-                            body.to_string().into_bytes(),
-                            mime::APPLICATION_JSON
-                        ))
-                    );
+                            let res = create_response(
+                                &state,
+                                StatusCode::Ok,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
 
-                    future::ok((state, res))
+                            return future::ok((state, res));
+                        },
+                        Err(_e) => {
+                            let res = create_response(&state, StatusCode::NotFound, None);
+                            return future::ok((state, res));
+                        }
+                    }
+
                 },
                 Err(e) => future::err((state, e.into_handler_error()))
             });

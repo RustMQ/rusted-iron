@@ -1,7 +1,7 @@
 extern crate serde_json;
 
 use chrono::prelude::*;
-use redis::{Commands, Connection, Iter, RedisError, Value, cmd, pipe};
+use redis::{Commands, Connection, Iter, Value, cmd, pipe};
 use serde_redis::RedisDeserialize;
 use mq::message::{
     push_message
@@ -19,8 +19,9 @@ use queue::{
 use std::collections::HashMap;
 use failure::Error;
 
-pub fn list_queues(con: &Connection) -> Vec<QueueLite> {
-    let r: Vec<String> = cmd("SMEMBERS").arg("queues".to_string()).query(con).unwrap();
+pub fn list_queues(con: &Connection) -> Result<Vec<QueueLite>, Error> {
+    let r: Vec<String> = con.smembers("queues")?;
+
     let mut res: Vec<QueueLite> = Vec::new();
     for queue_name in r {
         res.push(QueueLite {
@@ -28,26 +29,16 @@ pub fn list_queues(con: &Connection) -> Vec<QueueLite> {
         })
     }
 
-    res
+    Ok(res)
 }
 
 pub fn get_queue(queue_name: &String, con: &Connection) -> Result<Queue, Error> {
     ensure!(!queue_name.trim().is_empty(), "Queue not found");
 
     let queue_key = Queue::get_queue_key(queue_name);
-    let v: Result<Value, RedisError> = con.hgetall(queue_key);
+    let v: Value = con.hgetall(queue_key)?;
 
-    let result: Queue = match v {
-        Ok(v) => {
-            v.deserialize().unwrap()
-        },
-        Err(e) => {
-            debug!("qet_queue error: {:?}", e);
-            Queue::new()
-        },
-    };
-
-    Ok(result)
+    Ok(v.deserialize()?)
 }
 
 pub fn get_message_counter_key(queue_id: &String) -> String {
