@@ -1,25 +1,17 @@
 extern crate redis;
 extern crate serde_json;
 
-use std::collections::{HashMap};
 use objectid::{ObjectId};
 use redis::*;
+use serde_redis::RedisDeserialize;
 use api::message::MessageDeleteBodyRequest;
 use mq::queue::*;
 use queue::{
-    message::PushMessage,
+    message::*,
     queue::Queue,
     queue_info::{QueueInfo, QueueType}
 };
 use failure::Error;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Message {
-    pub id: Option<String>,
-    pub body: Option<String>,
-    pub reservation_id: Option<String>,
-    pub source_msg_id: Option<String>
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReserveMessageParams {
@@ -28,45 +20,6 @@ pub struct ReserveMessageParams {
 }
 
 pub const MAXIMUM_NUMBER_TO_PEEK: i32 = 1;
-
-impl Message {
-    pub fn new() -> Message {
-        Message {
-            id: None,
-            body: None,
-            reservation_id: None,
-            source_msg_id: None
-        }
-    }
-
-    pub fn new_from_hash(message_id: String, hash_map: HashMap<String, String>) -> Message {
-        let mut msg = Message::new();
-        msg.id = Some(message_id);
-
-        match hash_map.get(&*"body") {
-            Some(v) => {
-                msg.body = Some(v.to_string());
-            },
-            _ => msg.body = None
-        }
-
-        match hash_map.get(&*"reservation_id") {
-            Some(v) => {
-                msg.reservation_id = Some(v.to_string());
-            },
-            _ => msg.reservation_id = None
-        }
-
-        match hash_map.get(&*"source_msg_id") {
-            Some(v) => {
-                msg.source_msg_id = Some(v.to_string());
-            },
-            _ => msg.source_msg_id = None
-        }
-
-        msg
-    }
-}
 
 pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
     let queue_name: String = queue.name.expect("Queue Name");
@@ -80,15 +33,8 @@ pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
     let mut msg_key = String::new();
     msg_key.push_str(&queue_key);
     msg_key.push_str(":msg:");
-    let msg_body: String = message.body.expect("Message body");
-    let mut msg = ::queue::message::Message {
-        id: None,
-        delay: None,
-        body: msg_body.clone(),
-        source_msg_id: None,
-        reservation_id: None,
-        reserved_count: None,
-    };
+
+    let mut msg = Message::with_body(&message.body);
     let msg_id = redis::transaction(con, &[&msg_counter_key], |pipe| {
         let msg_id: i32 = cmd("GET").arg(&msg_counter_key).query(con).unwrap();
         msg_key.push_str(&msg_id.to_string());
@@ -99,7 +45,7 @@ pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
                 .cmd("HMSET")
                     .arg(&msg_key)
                     .arg("body")
-                    .arg(&msg_body)
+                    .arg(&message.body)
                     .arg("id")
                     .arg(&msg_id.to_string())
                     .arg("source_msg_id")
@@ -150,18 +96,15 @@ pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
     msg_id
 }
 
-pub fn get_message(queue_id: &String, message_id: &String, con: &Connection) -> Message {
+pub fn get_message(queue_id: &String, message_id: &String, con: &Connection) -> Result<Message, Error> {
     let queue_key = Queue::get_queue_key(queue_id);
     let mut msg_key = String::new();
     msg_key.push_str(&queue_key);
     msg_key.push_str(":msg:");
     msg_key.push_str(&message_id.to_string());
-    let result: HashMap<String, String> = cmd("HGETALL").arg(msg_key).query(con).unwrap();
-    if result.is_empty() {
-        return Message::new()
-    }
+    let v: Value = con.hgetall(msg_key)?;
 
-    Message::new_from_hash(message_id.to_string(), result)
+    Ok(v.deserialize()?)
 }
 
 pub fn delete_message(queue_name: &String, message: &Message, con: &Connection) -> bool {
@@ -191,7 +134,7 @@ pub fn delete_message(queue_name: &String, message: &Message, con: &Connection) 
     true
 }
 
-pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Vec<Message> {
+pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Result<Vec<Message>, Error> {
     let mut result = Vec::new();
 
     let mut queue_key = String::new();
@@ -220,7 +163,7 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
     }
 
     if message_list_for_move.is_empty() {
-        return result
+        return Ok(result)
     }
 
     // 1. TX unreserved -> reserved
@@ -245,11 +188,8 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
     };
     // 3. collect updated msgs
     for updated_msg_key in message_list_for_delete.clone() {
-        let mut updated_msg: Result<HashMap<String,String>, RedisError> = con.hgetall(&updated_msg_key);
-        match updated_msg {
-            Ok(msg) => result.push(Message::new_from_hash(msg["id"].clone(), msg)),
-            Err(err) => println!("Error: {:?}", err),
-        }
+        let v: Value = con.hgetall(&updated_msg_key)?;
+        result.push(v.deserialize()?);
     };
 
     if reserve_params.delete == Some(true) {
@@ -258,14 +198,16 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
         }
     }
 
-    result
+    Ok(result)
 }
 
 pub fn delete(queue_name: String, message_id: String, con: &Connection) -> bool {
     let m = Message {
         id: Some(message_id),
-        body: None,
+        body: String::new(),
+        delay: None,
         reservation_id: None,
+        reserved_count: None,
         source_msg_id: None,
     };
 
@@ -282,14 +224,14 @@ pub fn delete_messages(queue_name: String, messages: &Vec<MessageDeleteBodyReque
     res
 }
 
-pub fn touch_message(queue_id: &String, message_id: &String, reservation_id: &String, con: &Connection) -> String {
+pub fn touch_message(queue_id: &String, message_id: &String, reservation_id: &String, con: &Connection) -> Result<String, Error> {
     let queue_key = Queue::get_queue_key(queue_id);
     let mut msg_key = String::new();
     msg_key.push_str(&queue_key);
     msg_key.push_str(":msg:");
     msg_key.push_str(&message_id.to_string());
 
-    let msg = get_message(&queue_id, &message_id, con);
+    let msg = get_message(&queue_id, &message_id, con)?;
 
     let current_reservation_id = match msg.reservation_id {
         Some(reservation_id) => reservation_id,
@@ -297,16 +239,16 @@ pub fn touch_message(queue_id: &String, message_id: &String, reservation_id: &St
     };
 
     if current_reservation_id != reservation_id.to_string() {
-        return String::new()
+        return Ok(String::new())
     }
 
     let oid: ObjectId = ObjectId::new().unwrap();
     let _: isize = cmd("HSET").arg(msg_key).arg("reservation_id").arg(oid.to_string()).query(con).unwrap();
 
-    oid.to_string()
+    Ok(oid.to_string())
 }
 
-pub fn peek_messages(queue_name: &String, number_to_peek: &i32, con: &Connection) -> Vec<Message> {
+pub fn peek_messages(queue_name: &String, number_to_peek: &i32, con: &Connection) -> Result<Vec<Message>, Error> {
     let mut result = Vec::new();
 
     let mut queue_key = String::new();
@@ -324,17 +266,14 @@ pub fn peek_messages(queue_name: &String, number_to_peek: &i32, con: &Connection
     };
 
     for msg_key in message_key_list {
-        let mut msg_res: Result<HashMap<String,String>, RedisError> = con.hgetall(&msg_key);
-        match msg_res {
-            Ok(map) => result.push(Message::new_from_hash(map["id"].clone(), map)),
-            Err(err) => println!("Error: {:?}", err),
-        }
+        let v: Value = con.hgetall(&msg_key)?;
+        result.push(v.deserialize()?);
     };
 
-    result
+    Ok(result)
 }
 
-pub fn release_message(queue_name: &String, message_id: &String, reservation_id: &String, con: &Connection) -> bool {
+pub fn release_message(queue_name: &String, message_id: &String, reservation_id: &String, con: &Connection) -> Result<bool, Error> {
     let mut queue_key = String::new();
     queue_key.push_str("queue:");
     queue_key.push_str(&queue_name);
@@ -352,14 +291,14 @@ pub fn release_message(queue_name: &String, message_id: &String, reservation_id:
     msg_key.push_str(":msg:");
     msg_key.push_str(&message_id.to_string());
 
-    let msg = get_message(&queue_name, &message_id, con);
+    let msg = get_message(&queue_name, &message_id, con)?;
 
     let current_reservation_id = match msg.reservation_id {
         Some(reservation_id) => reservation_id,
         None => String::new(),
     };
     if current_reservation_id != reservation_id.to_string() {
-        return false
+        return Ok(false)
     }
 
     let msg_score: i32 = cmd("ZSCORE").arg(&queue_reserved_key).arg(&msg_key).query(con).unwrap();
@@ -373,9 +312,9 @@ pub fn release_message(queue_name: &String, message_id: &String, reservation_id:
     let (res,): (i32,) = pipe.query(con).unwrap();
 
     if res == 1 {
-        return true
+        return Ok(true)
     } else {
-        return false
+        return Ok(false)
     }
 }
 

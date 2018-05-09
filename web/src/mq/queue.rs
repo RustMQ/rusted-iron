@@ -4,10 +4,10 @@ use chrono::prelude::*;
 use redis::{Commands, Connection, Iter, RedisError, Value, cmd, pipe};
 use serde_redis::RedisDeserialize;
 use mq::message::{
-    Message,
     push_message
 };
 use queue::{
+    message::*,
     queue::{Queue, QueueLite},
     queue_info::{
         QueueInfo,
