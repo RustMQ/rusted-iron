@@ -51,7 +51,7 @@ pub fn get_message_counter_key(queue_id: &String) -> String {
 }
 
 pub fn post_message(queue: Queue, message: Message, con: &Connection) -> Result<i32, Error> {
-    Ok(push_message(queue.clone(), message, con))
+    Ok(push_message(queue.clone(), message, con)?)
 }
 
 pub fn create_queue(queue_info: QueueInfo, con: &Connection) -> QueueInfo {

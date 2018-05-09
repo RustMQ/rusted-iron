@@ -21,7 +21,7 @@ pub struct ReserveMessageParams {
 
 pub const MAXIMUM_NUMBER_TO_PEEK: i32 = 1;
 
-pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
+pub fn push_message(queue: Queue, message: Message, con: &Connection) -> Result<i32, Error> {
     let queue_name: String = queue.name.expect("Queue Name");
     let queue_key: String = Queue::get_queue_key(&queue_name);
 
@@ -36,11 +36,11 @@ pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
 
     let mut msg = Message::with_body(&message.body);
     let msg_id = redis::transaction(con, &[&msg_counter_key], |pipe| {
-        let msg_id: i32 = cmd("GET").arg(&msg_counter_key).query(con).unwrap();
+        let msg_id: i32 = con.get(&msg_counter_key)?;
         msg_key.push_str(&msg_id.to_string());
         let oid = ObjectId::new().unwrap();
         msg.source_msg_id = Some(oid.clone().to_string());
-        let _response: Result<Vec<String>, RedisError> = pipe
+        let _response: Vec<String> = pipe
                 .atomic()
                 .cmd("HMSET")
                     .arg(&msg_key)
@@ -63,10 +63,11 @@ pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
                     .arg("totalrecv")
                     .arg("1")
                     .ignore()
-                .query(con);
+                .query(con)?;
 
         Ok(Some(msg_id))
     }).unwrap();
+
     msg.id = Some(msg_id.clone().to_string());
     let qi_as_string = match queue.value {
         Some(v) => v,
@@ -87,13 +88,13 @@ pub fn push_message(queue: Queue, message: Message, con: &Connection) -> i32 {
         msg_channel_key.push_str(&queue_key.clone());
         msg_channel_key.push_str(":msg:channel");
 
-        let _ : isize = cmd("PUBLISH")
+        cmd("PUBLISH")
             .arg(&msg_channel_key)
             .arg(serde_json::to_string(&pm).unwrap())
-            .query(con).unwrap();
+            .execute(con);
     }
 
-    msg_id
+    Ok(msg_id)
 }
 
 pub fn get_message(queue_id: &String, message_id: &String, con: &Connection) -> Result<Message, Error> {
