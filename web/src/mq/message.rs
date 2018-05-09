@@ -210,6 +210,7 @@ pub fn delete(queue_name: String, message_id: String, con: &Connection) -> Resul
         reservation_id: None,
         reserved_count: None,
         source_msg_id: None,
+        state: None
     };
 
     delete_message(&queue_name, &m, con)

@@ -7,13 +7,22 @@ pub struct Message {
     #[serde(skip_serializing_if = "Option::is_none")] pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")] pub reserved_count: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")] pub reservation_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub source_msg_id: Option<String>
+    #[serde(skip_serializing_if = "Option::is_none")] pub source_msg_id: Option<String>,
+    #[serde(skip_serializing)]
+    pub state: Option<MessageState>
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PushMessage {
     pub queue_info: QueueInfo,
     pub msg: Message
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum MessageState {
+    Reserved,
+    Unreserved
 }
 
 impl Message {
@@ -25,6 +34,7 @@ impl Message {
             reserved_count: None,
             reservation_id: None,
             source_msg_id: None,
+            state: Some(MessageState::Unreserved)
         }
     }
 
@@ -36,6 +46,7 @@ impl Message {
             reserved_count: None,
             reservation_id: None,
             source_msg_id: None,
+            state: Some(MessageState::Unreserved)
         }
     }
 }
