@@ -108,7 +108,7 @@ pub fn get_message(queue_id: &String, message_id: &String, con: &Connection) -> 
     Ok(v.deserialize()?)
 }
 
-pub fn delete_message(queue_name: &String, message: &Message, con: &Connection) -> bool {
+pub fn delete_message(queue_name: &String, message: &Message, con: &Connection) -> Result<bool, Error> {
     let mut queue_key = String::new();
     queue_key.push_str("queue:");
     queue_key.push_str(&queue_name);
@@ -130,9 +130,9 @@ pub fn delete_message(queue_name: &String, message: &Message, con: &Connection) 
         .zrem(&queue_reserved_key, &[&msg_key]).ignore()
         .zrem(&queue_unreserved_key, &[&msg_key]).ignore()
         .del(&msg_key)
-        .query(con).unwrap();
+        .query(con)?;
 
-    true
+    Ok(true)
 }
 
 pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessageParams, con: &Connection) -> Result<Vec<Message>, Error> {
@@ -202,7 +202,7 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
     Ok(result)
 }
 
-pub fn delete(queue_name: String, message_id: String, con: &Connection) -> bool {
+pub fn delete(queue_name: String, message_id: String, con: &Connection) -> Result<bool, Error> {
     let m = Message {
         id: Some(message_id),
         body: String::new(),
@@ -215,14 +215,14 @@ pub fn delete(queue_name: String, message_id: String, con: &Connection) -> bool 
     delete_message(&queue_name, &m, con)
 }
 
-pub fn delete_messages(queue_name: String, messages: &Vec<MessageDeleteBodyRequest>, con: &Connection) -> Vec<bool> {
+pub fn delete_messages(queue_name: String, messages: &Vec<MessageDeleteBodyRequest>, con: &Connection) -> Result<Vec<bool>, Error> {
     let mut res = Vec::new();
 
     for m in messages {
-        res.push(delete(queue_name.to_string(), m.id.to_owned(), con));
+        res.push(delete(queue_name.to_string(), m.id.to_owned(), con)?);
     }
 
-    res
+    Ok(res)
 }
 
 pub fn touch_message(queue_id: &String, message_id: &String, reservation_id: &String, con: &Connection) -> Result<String, Error> {
