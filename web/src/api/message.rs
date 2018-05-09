@@ -38,22 +38,28 @@ pub fn delete(mut state: State) -> Box<HandlerFuture> {
                         (path.name.clone().unwrap(), path.message_id.clone().unwrap())
                     };
 
-                    ::mq::message::delete(queue_name, message_id, &connection);
+                    match ::mq::message::delete(queue_name, message_id, &connection) {
+                        Ok(_deleted) => {
+                            let body = json!({
+                                "msg": "Deleted"
+                            });
 
-                    let body = json!({
-                        "msg": "Deleted"
-                    });
+                            let res = create_response(
+                                &state,
+                                StatusCode::Ok,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
 
-                    let res = create_response(
-                        &state,
-                        StatusCode::Ok,
-                        Some((
-                            body.to_string().into_bytes(),
-                            mime::APPLICATION_JSON
-                        ))
-                    );
-
-                    future::ok((state, res))
+                            return future::ok((state, res));
+                        },
+                        Err(_e) => {
+                            let res = create_response(&state, StatusCode::NotFound, None);
+                            return future::ok((state, res));
+                        }
+                    }
                 },
                 Err(e) => future::err((state, e.into_handler_error()))
             });
@@ -120,22 +126,28 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
 
                     let messages: Vec<MessageDeleteBodyRequest> = serde_json::from_value(body_content["ids"].clone()).unwrap();
 
-                    ::mq::message::delete_messages(queue_name, &messages, &connection);
+                    match ::mq::message::delete_messages(queue_name, &messages, &connection) {
+                        Ok(_deleted) => {
+                            let body = json!({
+                                "msg": "Deleted"
+                            });
 
-                    let body = json!({
-                        "msg": "Deleted"
-                    });
+                            let res = create_response(
+                                &state,
+                                StatusCode::Ok,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
 
-                    let res = create_response(
-                        &state,
-                        StatusCode::Ok,
-                        Some((
-                            body.to_string().into_bytes(),
-                            mime::APPLICATION_JSON
-                        ))
-                    );
-
-                    future::ok((state, res))
+                            return future::ok((state, res));
+                        },
+                        Err(_e) => {
+                            let res = create_response(&state, StatusCode::NotFound, None);
+                            return future::ok((state, res));
+                        }
+                    }
                 },
                 Err(e) => future::err((state, e.into_handler_error()))
             });

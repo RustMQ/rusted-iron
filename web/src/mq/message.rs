@@ -195,7 +195,7 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
 
     if reserve_params.delete == Some(true) {
         for message in result.clone() {
-            delete_message(&queue_name, &message, con);
+            let _ = delete_message(&queue_name, &message, con)?;
         }
     }
 

@@ -271,7 +271,9 @@ pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &C
         }
     }
 
-    update_queue_info(current_queue_info.clone(), con);
-
-    Ok(current_queue_info)
+    if update_queue_info(current_queue_info.clone(), con)? {
+        return Ok(current_queue_info);
+    } else {
+        bail!("Queue failed to update");
+    }
 }
