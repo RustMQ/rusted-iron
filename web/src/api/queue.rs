@@ -245,14 +245,19 @@ pub fn delete_queue(mut state: State) -> Box<HandlerFuture> {
                     };
 
                     match delete(name, &connection) {
-                        Ok(_deleted) => {
+                        Ok(deleted) => {
+                            let (message, status_code) = match deleted {
+                                true => ("Deleted.", StatusCode::Ok),
+                                false => ("Queue not found", StatusCode::NotFound),
+                            };
+
                             let body = json!({
-                                "msg": "Deleted."
+                                "msg": message
                             });
 
                             let res = create_response(
                                 &state,
-                                StatusCode::Ok,
+                                status_code,
                                 Some((
                                     body.to_string().into_bytes(),
                                     mime::APPLICATION_JSON
