@@ -21,8 +21,7 @@ pub struct ReserveMessageParams {
 
 pub const MAXIMUM_NUMBER_TO_PEEK: i32 = 1;
 
-pub fn push_message(queue: Queue, message: Message, con: &Connection) -> Result<i32, Error> {
-    let queue_name: String = queue.name.expect("Queue Name");
+pub fn push_message(queue_name: String, message: Message, con: &Connection) -> Result<i32, Error> {
     let queue_key: String = Queue::get_queue_key(&queue_name);
 
     let mut queue_unreserved_key = String::new();
@@ -69,15 +68,10 @@ pub fn push_message(queue: Queue, message: Message, con: &Connection) -> Result<
     }).unwrap();
 
     msg.id = Some(msg_id.clone().to_string());
-    let qi_as_string = match queue.value {
-        Some(v) => v,
-        None => {
-            debug!("QI parse error: {:?}", queue.value);
-            String::new()
-        }
-    };
+    let queue = get_queue(&queue_name, &con)?;
+    let qi_as_string = queue.value.expect("Queue Info should be present");
 
-    let qi: QueueInfo = serde_json::from_str(qi_as_string.as_str()).unwrap();
+    let qi: QueueInfo = serde_json::from_str(qi_as_string.as_str())?;
     let queue_type = qi.queue_type.clone().unwrap();
     if queue_type == QueueType::Unicast || queue_type == QueueType::Multicast {
         let pm: PushMessage = PushMessage {

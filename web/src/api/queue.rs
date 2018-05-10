@@ -108,7 +108,7 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                         .into_iter()
                         .map(|msg| {
                             let m = Message::with_body(&msg.body);
-                            let mid = post_message(q.clone(), m, &*connection).expect("Message put on queue.");
+                            let mid = post_message(q.name.clone().unwrap(), m, &*connection).expect("Message put on queue.");
                             mid.to_string()
                         }).collect();
 
@@ -291,7 +291,7 @@ pub fn push_messages_via_webhook(mut state: State) -> Box<HandlerFuture> {
                 let message = Message::with_body(&body_content.to_string());
 
                 let q = get_queue(&name, &connection).unwrap();
-                let id = post_message(q, message, &*connection).expect("Message put on queue.");
+                let id = post_message(q.name.clone().unwrap(), message, &*connection).expect("Message put on queue.");
 
                 let body = json!({
                     "id": id,
