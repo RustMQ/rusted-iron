@@ -1,13 +1,13 @@
 extern crate serde_json;
 
 use chrono::prelude::*;
-use redis::{Commands, Connection, Iter, RedisError, Value, cmd, pipe};
+use redis::{Commands, Connection, Iter, Value, cmd, pipe};
 use serde_redis::RedisDeserialize;
 use mq::message::{
-    Message,
     push_message
 };
 use queue::{
+    message::*,
     queue::{Queue, QueueLite},
     queue_info::{
         QueueInfo,
@@ -19,8 +19,9 @@ use queue::{
 use std::collections::HashMap;
 use failure::Error;
 
-pub fn list_queues(con: &Connection) -> Vec<QueueLite> {
-    let r: Vec<String> = cmd("SMEMBERS").arg("queues".to_string()).query(con).unwrap();
+pub fn list_queues(con: &Connection) -> Result<Vec<QueueLite>, Error> {
+    let r: Vec<String> = con.smembers("queues")?;
+
     let mut res: Vec<QueueLite> = Vec::new();
     for queue_name in r {
         res.push(QueueLite {
@@ -28,26 +29,16 @@ pub fn list_queues(con: &Connection) -> Vec<QueueLite> {
         })
     }
 
-    res
+    Ok(res)
 }
 
 pub fn get_queue(queue_name: &String, con: &Connection) -> Result<Queue, Error> {
     ensure!(!queue_name.trim().is_empty(), "Queue not found");
 
     let queue_key = Queue::get_queue_key(queue_name);
-    let v: Result<Value, RedisError> = con.hgetall(queue_key);
+    let v: Value = con.hgetall(queue_key)?;
 
-    let result: Queue = match v {
-        Ok(v) => {
-            v.deserialize().unwrap()
-        },
-        Err(e) => {
-            debug!("qet_queue error: {:?}", e);
-            Queue::new()
-        },
-    };
-
-    Ok(result)
+    Ok(v.deserialize()?)
 }
 
 pub fn get_message_counter_key(queue_id: &String) -> String {
@@ -59,8 +50,8 @@ pub fn get_message_counter_key(queue_id: &String) -> String {
     key
 }
 
-pub fn post_message(queue: Queue, message: Message, con: &Connection) -> Result<i32, Error> {
-    Ok(push_message(queue.clone(), message, con))
+pub fn post_message(queue_name: String, message: Message, con: &Connection) -> Result<i32, Error> {
+    Ok(push_message(queue_name, message, con)?)
 }
 
 pub fn create_queue(queue_info: QueueInfo, con: &Connection) -> QueueInfo {
@@ -96,19 +87,19 @@ pub fn create_queue(queue_info: QueueInfo, con: &Connection) -> QueueInfo {
     queue_info
 }
 
-pub fn delete(queue_name: String, con: &Connection) -> bool {
+pub fn delete(queue_name: String, con: &Connection) -> Result<bool, Error> {
     let mut match_queue_key = String::new();
     match_queue_key.push_str("queue:");
     match_queue_key.push_str(&queue_name);
     match_queue_key.push_str("*");
 
-    let iter : Iter<String> = cmd("SCAN").cursor_arg(0).arg("MATCH").arg(match_queue_key).iter(con).unwrap();
+    let iter : Iter<String> = cmd("SCAN").cursor_arg(0).arg("MATCH").arg(match_queue_key).iter(con)?;
     for key in iter {
         info!("DK: {:?}", key);
-        let _: () = cmd("DEL").arg(key).query(con).unwrap();
+        let _: () = con.del(key)?;
     }
 
-    true
+    Ok(true)
 }
 
 pub fn get_queue_info(queue_name: String, con: &Connection) -> Result<QueueInfo, Error> {
@@ -123,7 +114,7 @@ pub fn get_queue_info(queue_name: String, con: &Connection) -> Result<QueueInfo,
     return Ok(queue_info);
 }
 
-pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> bool {
+pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> Result<bool, Error> {
     let queue_info_res = get_queue_info(queue_name, con);
     let mut current_subscribers;
     let mut queue_info = queue_info_res.unwrap();
@@ -159,10 +150,10 @@ pub fn update_subscribers(queue_name: String, mut new_subscribers: Vec<QueueSubs
         return update_queue_info(queue_info, con)
     }
 
-    false
+    Ok(false)
 }
 
-pub fn update_queue_info(queue_info: QueueInfo, con: &Connection) -> bool {
+pub fn update_queue_info(queue_info: QueueInfo, con: &Connection) -> Result<bool, Error> {
     let mut queue_key = String::new();
     queue_key.push_str("queue:");
     queue_key.push_str(queue_info.name.clone().unwrap().as_str());
@@ -171,12 +162,12 @@ pub fn update_queue_info(queue_info: QueueInfo, con: &Connection) -> bool {
         .arg(queue_key)
         .arg("value")
         .arg(serde_json::to_string(&queue_info).unwrap())
-        .query(con).unwrap();
+        .query(con)?;
 
-    true
+    Ok(true)
 }
 
-pub fn replace_subscribers(queue_name: String, new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> bool {
+pub fn replace_subscribers(queue_name: String, new_subscribers: Vec<QueueSubscriber>, con: &Connection) -> Result<bool, Error> {
     let queue_info_res = get_queue_info(queue_name, con);
     let mut queue_info = queue_info_res.unwrap();
     if queue_info.push.is_some() {
@@ -194,10 +185,10 @@ pub fn replace_subscribers(queue_name: String, new_subscribers: Vec<QueueSubscri
         return update_queue_info(queue_info, con)
     }
 
-    false
+    Ok(false)
 }
 
-pub fn delete_subscribers(queue_name: String, subscribers_for_delete: Vec<QueueSubscriber>, con: &Connection) -> bool {
+pub fn delete_subscribers(queue_name: String, subscribers_for_delete: Vec<QueueSubscriber>, con: &Connection) -> Result<bool, Error> {
     let queue_info_res = get_queue_info(queue_name.clone(), con);
     let current_subscribers;
     let queue_info = queue_info_res.unwrap();
@@ -211,7 +202,7 @@ pub fn delete_subscribers(queue_name: String, subscribers_for_delete: Vec<QueueS
         },
     };
     if current_subscribers.len() == 1 {
-        return false;
+        return Ok(false);
     }
     let subscribers_for_delete_as_map: HashMap<_, _> = subscribers_for_delete.iter()
         .map(|s| (s.name.clone(), s))
@@ -268,7 +259,7 @@ pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &C
                 new_push.error_queue = current_push.error_queue;
             }
             if push.subscribers.is_some() {
-                if !update_subscribers(queue_name, push.subscribers.clone().unwrap(), con) {
+                if !update_subscribers(queue_name, push.subscribers.clone().unwrap(), con)? {
                     bail!("Bad request");
                 }
 
@@ -280,7 +271,9 @@ pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &C
         }
     }
 
-    update_queue_info(current_queue_info.clone(), con);
-
-    Ok(current_queue_info)
+    if update_queue_info(current_queue_info.clone(), con)? {
+        return Ok(current_queue_info);
+    } else {
+        bail!("Queue failed to update");
+    }
 }

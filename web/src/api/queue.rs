@@ -17,13 +17,13 @@ use serde_json::Value;
 use middleware::redis::RedisPool;
 use mq::{
     message::{
-        Message,
         ReserveMessageParams
     },
     queue::{create_queue, delete, get_queue, post_message, patch_queue_info}
 };
 use queue::{
-    queue_info::{QueueInfo, QueueSubscriber}
+    queue_info::{QueueInfo, QueueSubscriber},
+    message::*
 };
 
 #[derive(Debug, Deserialize, StateData, StaticResponseExtender)]
@@ -107,9 +107,8 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                     let mut result: Vec<String> = messages
                         .into_iter()
                         .map(|msg| {
-                            let mut m: Message = Message::new();
-                            m.body = msg.body;
-                            let mid = post_message(q.clone(), m, &*connection).expect("Message put on queue.");
+                            let m = Message::with_body(&msg.body);
+                            let mid = post_message(q.name.clone().unwrap(), m, &*connection).expect("Message put on queue.");
                             mid.to_string()
                         }).collect();
 
@@ -143,41 +142,44 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
         .concat2()
         .then(|full_body| match full_body {
             Ok(valid_body) => {
-
-                let messages: Vec<Message> = {
-                    let connection = {
-                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
-                        let connection = redis_pool.conn().unwrap();
-                        connection
-                    };
-                    let name: String = {
-                        let path = QueuePathExtractor::borrow_from(&state);
-                        path.name.clone().unwrap()
-                    };
-
-                    let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
-                    let mut reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
-                    if reserve_params.delete.is_none() {
-                        reserve_params.delete = Some(false)
-                    }
-
-                    ::mq::message::reserve_messages(&name, &reserve_params, &connection)
+                let connection = {
+                    let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                    let connection = redis_pool.conn().unwrap();
+                    connection
+                };
+                let name: String = {
+                    let path = QueuePathExtractor::borrow_from(&state);
+                    path.name.clone().unwrap()
                 };
 
-                let body = json!({
-                    "messages": messages
-                });
+                let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
+                let mut reserve_params: ReserveMessageParams = serde_json::from_str(&body_content).unwrap();
+                if reserve_params.delete.is_none() {
+                    reserve_params.delete = Some(false)
+                }
 
-                let res = create_response(
-                    &state,
-                    StatusCode::Ok,
-                    Some((
-                        body.to_string().into_bytes(),
-                        mime::APPLICATION_JSON
-                    )),
-                );
+                match ::mq::message::reserve_messages(&name, &reserve_params, &connection) {
+                    Ok(messages) => {
+                        let body = json!({
+                            "messages": messages
+                        });
 
-                future::ok((state, res))
+                        let res = create_response(
+                            &state,
+                            StatusCode::Ok,
+                            Some((
+                                body.to_string().into_bytes(),
+                                mime::APPLICATION_JSON
+                            )),
+                        );
+
+                        return future::ok((state, res));
+                    },
+                    Err(_e) => {
+                        let res = create_response(&state, StatusCode::NotFound, None);
+                        return future::ok((state, res));
+                    }
+                }
             },
             Err(e) => future::err((state, e.into_handler_error()))
         });
@@ -196,20 +198,29 @@ pub fn list_queues(mut state: State) -> Box<HandlerFuture> {
                         connection
                     };
 
-                    let body = json!({
-                        "queues": ::mq::queue::list_queues(&connection)
-                    });
+                    match ::mq::queue::list_queues(&connection) {
+                        Ok(queues) => {
+                            let body = json!({
+                                "queues": queues
+                            });
 
-                    let res = create_response(
-                        &state,
-                        StatusCode::Ok,
-                        Some((
-                            body.to_string().into_bytes(),
-                            mime::APPLICATION_JSON
-                        ))
-                    );
+                            let res = create_response(
+                                &state,
+                                StatusCode::Ok,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
 
-                    future::ok((state, res))
+                            return future::ok((state, res));
+                        },
+                        Err(_e) => {
+                            let res = create_response(&state, StatusCode::NotFound, None);
+                            return future::ok((state, res));
+                        }
+                    }
+
                 },
                 Err(e) => future::err((state, e.into_handler_error()))
             });
@@ -233,22 +244,28 @@ pub fn delete_queue(mut state: State) -> Box<HandlerFuture> {
                         path.name.clone().unwrap()
                     };
 
-                    delete(name, &connection);
+                    match delete(name, &connection) {
+                        Ok(_deleted) => {
+                            let body = json!({
+                                "msg": "Deleted."
+                            });
 
-                    let body = json!({
-                        "msg": "Deleted."
-                    });
+                            let res = create_response(
+                                &state,
+                                StatusCode::Ok,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
 
-                    let res = create_response(
-                        &state,
-                        StatusCode::Ok,
-                        Some((
-                            body.to_string().into_bytes(),
-                            mime::APPLICATION_JSON
-                        ))
-                    );
-
-                    future::ok((state, res))
+                            return future::ok((state, res));
+                        },
+                        Err(_e) => {
+                            let res = create_response(&state, StatusCode::NotFound, None);
+                            return future::ok((state, res));
+                        }
+                    }
                 },
                 Err(e) => future::err((state, e.into_handler_error()))
             });
@@ -271,10 +288,10 @@ pub fn push_messages_via_webhook(mut state: State) -> Box<HandlerFuture> {
                     path.name.clone().unwrap()
                 };
                 let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
-                let mut message: Message = Message::new();
-                message.body = Some(body_content.to_string());
+                let message = Message::with_body(&body_content.to_string());
+
                 let q = get_queue(&name, &connection).unwrap();
-                let id = post_message(q, message, &*connection).expect("Message put on queue.");
+                let id = post_message(q.name.clone().unwrap(), message, &*connection).expect("Message put on queue.");
 
                 let body = json!({
                     "id": id,
@@ -364,18 +381,24 @@ pub fn update_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let updated = ::mq::queue::update_subscribers(name, subscribers, &connection);
-                let body;
-                if updated {
-                    body = json!({
-                        "msg": String::from("Updated")
-                    });
+                let body = match ::mq::queue::update_subscribers(name, subscribers, &connection) {
+                    Ok(updated) => {
+                        if updated {
+                            json!({
+                                "msg": String::from("Updated")
+                            })
+                        } else {
+                            json!({
+                                "msg": String::from("Not Updated")
+                            })
+                        }
+                    },
+                    Err(_e) => {
+                        let res = create_response(&state, StatusCode::NotFound, None);
+                        return future::ok((state, res));
+                    }
+                };
 
-                } else {
-                    body = json!({
-                        "msg": String::from("Not Updated")
-                    });
-                }
                 let res = create_response(
                     &state,
                     StatusCode::Ok,
@@ -413,18 +436,25 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let updated = ::mq::queue::replace_subscribers(name, subscribers, &connection);
-                let body;
-                if updated {
-                    body = json!({
-                        "msg": String::from("Updated")
-                    });
 
-                } else {
-                    body = json!({
-                        "msg": String::from("Not Updated")
-                    });
-                }
+                let body = match ::mq::queue::replace_subscribers(name, subscribers, &connection) {
+                    Ok(updated) => {
+                        if updated {
+                            json!({
+                               "msg": String::from("Updated")
+                            })
+                        } else {
+                            json!({
+                                "msg": String::from("Not Updated")
+                            })
+                        }
+                    },
+                    Err(_e) => {
+                        let res = create_response(&state, StatusCode::NotFound, None);
+                        return future::ok((state, res));
+                    }
+                };
+
                 let res = create_response(
                     &state,
                     StatusCode::Ok,
@@ -462,18 +492,24 @@ pub fn delete_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let updated = ::mq::queue::delete_subscribers(name, subscribers, &connection);
-                let body;
-                if updated {
-                    body = json!({
-                        "msg": String::from("Updated")
-                    });
+                let body = match ::mq::queue::delete_subscribers(name, subscribers, &connection) {
+                    Ok(updated) => {
+                        if updated {
+                            json!({
+                                "msg": String::from("Updated")
+                            })
+                        } else {
+                            json!({
+                                "msg": String::from("Not Updated")
+                            })
+                        }
+                    },
+                    Err(_e) => {
+                        let res = create_response(&state, StatusCode::NotFound, None);
+                        return future::ok((state, res));
+                    }
+                };
 
-                } else {
-                    body = json!({
-                        "msg": String::from("Not Updated")
-                    });
-                }
                 let res = create_response(
                     &state,
                     StatusCode::Ok,
