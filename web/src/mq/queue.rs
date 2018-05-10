@@ -94,12 +94,16 @@ pub fn delete(queue_name: String, con: &Connection) -> Result<bool, Error> {
     match_queue_key.push_str("*");
 
     let iter : Iter<String> = cmd("SCAN").cursor_arg(0).arg("MATCH").arg(match_queue_key).iter(con)?;
+    let mut deleted = false;
     for key in iter {
+        deleted = true;
         info!("DK: {:?}", key);
         let _: () = con.del(key)?;
     }
+    let _: () = con.srem("queues", &queue_name)?;
+    let _: () = con.del(Queue::get_queue_key(&queue_name))?;
 
-    Ok(true)
+    Ok(deleted)
 }
 
 pub fn get_queue_info(queue_name: String, con: &Connection) -> Result<QueueInfo, Error> {
