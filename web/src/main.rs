@@ -152,6 +152,10 @@ fn router(pool: Pool) -> Router {
                     route.delete("/subscribers")
                         .with_path_extractor::<QueuePathExtractor>()
                         .to(api::queue::delete_subscribers);
+
+                    route.get("/messages/:message_id/subscribers")
+                        .with_path_extractor::<QueuePathExtractor>()
+                        .to(api::message::get_push_statuses);
                 });
             });
         });
