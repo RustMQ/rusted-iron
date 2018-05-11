@@ -88,7 +88,7 @@ fn prepare_client() -> Client {
     Client::open(database_url.clone().as_str()).expect("Failed to obtain client")
 }
 
-fn update_push_status(push_message: PushMessage, subscriber: QueueSubscriber, status: StatusCode) -> Result<bool, Error> {
+fn update_push_status(push_message: PushMessage, subscriber: QueueSubscriber, status: StatusCode, try: u32) -> Result<bool, Error> {
     let client = prepare_client();
     let connection = client.get_connection().unwrap();
     let msg_key = {
@@ -108,10 +108,15 @@ fn update_push_status(push_message: PushMessage, subscriber: QueueSubscriber, st
 
         msg_key
     };
+    let retries = {
+        let queue_info = push_message.queue_info.clone();
+        let push = queue_info.push.unwrap();
+        push.retries.unwrap()
+    };
     let push_status = PushStatus {
         subscriber_name: subscriber.name,
-        retries_remaining: 0,
-        tries: 0,
+        retries_remaining: retries - try,
+        tries: try,
 	    status_code: Some(status.as_u16()),
 	    url: subscriber.url.unwrap(),
         msg: Some(push_message.msg.body.clone())
@@ -169,7 +174,7 @@ fn main() -> Result<(), Error> {
                     let mut break_retry = false;
                     for subscriber in subscribers.clone() {
                         let res = post_message_to_subscriber(msg.clone(), subscriber.clone());
-                        match update_push_status(pm.clone(), subscriber.clone(), res.status()) {
+                        match update_push_status(pm.clone(), subscriber.clone(), res.status(), i) {
                             Ok(_updated) => info!("Push status updated: {:?}", subscriber.url),
                             Err(e) => info!("Push status not updated: {:?}", e.to_string())
                         };
