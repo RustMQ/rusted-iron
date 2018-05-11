@@ -164,7 +164,7 @@ fn main() {
 
                 let is_unicast_mode = |queue_type: Option<QueueType>| queue_type.unwrap() == QueueType::Unicast;
                 let delay = Duration::from_secs(retry.retry_delay.into());
-                for i in 1..retry.retry_count + 1 {
+                for i in 1..=retry.retry_count {
                     info!("Retry num: {:#?}", i);
                     let mut break_retry = false;
                     for subscriber in subscribers.clone() {
