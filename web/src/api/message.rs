@@ -361,3 +361,61 @@ pub fn release_message(mut state: State) -> Box<HandlerFuture> {
 
         Box::new(f)
 }
+
+
+pub fn get_push_statuses(mut state: State) -> Box<HandlerFuture> {
+        let f = Body::take_from(&mut state)
+            .concat2()
+            .then(|full_body| match full_body {
+                Ok(_valid_body) => {
+                    let connection = {
+                        let redis_pool = RedisPool::borrow_mut_from(&mut state);
+                        let connection = redis_pool.conn().unwrap();
+                        connection
+                    };
+
+                    let (queue_name, message_id): (String, String) = {
+                        let path = QueuePathExtractor::borrow_from(&state);
+                        (path.name.clone().unwrap(), path.message_id.clone().unwrap())
+                    };
+
+                    match ::mq::message::get_push_statuses(&queue_name, &message_id, &connection) {
+                        Ok(subscribers) => {
+                            let body = json!({
+                                "subscribers": subscribers
+                            });
+
+                            let res = create_response(
+                                &state,
+                                StatusCode::Ok,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
+
+                            return future::ok((state, res));
+                        },
+                        Err(e) => {
+                            let body = json!({
+                                "msg": e.to_string()
+                            });
+
+                            let res = create_response(
+                                &state,
+                                StatusCode::NotFound,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
+
+                            return future::ok((state, res));
+                        }
+                    }
+                },
+                Err(e) => future::err((state, e.into_handler_error()))
+            });
+
+        Box::new(f)
+}
