@@ -612,14 +612,20 @@ pub fn update_queue(mut state: State) -> Box<HandlerFuture> {
                 }
 
                 let err = updated_queue_info_res.unwrap_err();
+                let error_message = err.to_string();
 
                 let body = json!({
-                    "msg": err.to_string()
+                    "msg": error_message
                 });
+
+                let status_code = match error_message.contains("subscriber") {
+                    true => StatusCode::BadRequest, 
+                    false => StatusCode::Forbidden
+                };
 
                 let res = create_response(
                     &state,
-                    StatusCode::Forbidden,
+                    status_code,
                     Some((
                         body.to_string().into_bytes(),
                         mime::APPLICATION_JSON

@@ -230,7 +230,7 @@ pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &C
         current_queue_info.message_expiration = queue_info_patch.message_expiration;
     }
 
-    if current_queue_info.queue_type == Some(QueueType::Pull) && queue_info_patch.push.is_some() {
+    if current_queue_info.queue_type != queue_info_patch.queue_type && queue_info_patch.queue_type.is_some() {
         bail!("Queue type cannot be changed")
     }
 
@@ -263,6 +263,9 @@ pub fn patch_queue_info(queue_name: String, queue_info_patch: QueueInfo, con: &C
                 new_push.error_queue = current_push.error_queue;
             }
             if push.subscribers.is_some() {
+                if push.subscribers.clone().unwrap().len() == 0 {
+                    bail!("Push queues must have at least one subscriber");
+                }
                 if !update_subscribers(queue_name, push.subscribers.clone().unwrap(), con)? {
                     bail!("Bad request");
                 }
