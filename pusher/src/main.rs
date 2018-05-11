@@ -122,17 +122,17 @@ fn update_push_status(push_message: PushMessage, subscriber: QueueSubscriber, st
     Ok(true)
 }
 
-fn main() {
+fn main() -> Result<(), Error> {
     env_logger::init();
 
     info!("pusher starting up");
     let client = prepare_client();
-    let mut pubsub = client.get_pubsub().expect("Failed to obtain pub-sub");
-    pubsub.psubscribe("queue:*:msg:channel").expect("Failed to subscribe on queue:*:msg:channel");
+    let mut pubsub = client.get_pubsub()?;
+    let () = pubsub.psubscribe("queue:*:msg:channel")?;
 
     loop {
-        let msg = pubsub.get_message().unwrap();
-        let payload : String = msg.get_payload().unwrap();
+        let msg = pubsub.get_message()?;
+        let payload: String = msg.get_payload()?;
         if !payload.is_empty() {
             let builder = thread::Builder::new();
             builder.spawn(move || {
@@ -206,4 +206,6 @@ fn main() {
             }).unwrap();
         }
     }
+
+    Ok(())
 }
