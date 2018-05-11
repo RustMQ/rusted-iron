@@ -9,7 +9,7 @@ use mq::queue::*;
 use queue::{
     message::*,
     queue::Queue,
-    queue_info::{QueueInfo, QueueType}
+    queue_info::{QueueInfo, QueueType, PushStatus}
 };
 use failure::Error;
 
@@ -348,4 +348,24 @@ pub fn clear_messages(queue_name: &String, con: &Connection) -> Result<bool, Err
     let _ : () = con.del(queue_reserved_key)?;
 
     Ok(true)
+}
+
+pub fn get_push_statuses(queue_name: &String, message_id: &String, con: &Connection) -> Result<Vec<PushStatus>, Error> {
+    let mut scan_key = String::new();
+    scan_key.push_str("queue:");
+    scan_key.push_str(queue_name);
+    scan_key.push_str(":msg:");
+    scan_key.push_str(message_id);
+    scan_key.push_str(":delivery:*");
+
+    let mut result = Vec::new();
+
+    let iter : Iter<String> = cmd("SCAN").cursor_arg(0).arg("MATCH").arg(scan_key).iter(con)?;
+    for key in iter {
+        let push_status: String = con.hget(&key, "push_status")?;
+        let v: PushStatus = serde_json::from_str(push_status.as_str())?;
+        result.push(v);
+    }
+
+    Ok(result)
 }
