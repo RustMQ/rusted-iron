@@ -5,14 +5,14 @@ use std::collections::HashMap;
 pub enum QueueType {
     Pull,
     Unicast,
-    Multicast
+    Multicast,
 }
 
 #[derive(Debug)]
 pub enum QueueState {
     Valid,
     TypeError,
-    SubscriberError
+    SubscriberError,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -59,6 +59,40 @@ impl QueueInfo {
         }
     }
 
+    pub fn fill_missed_fields(&mut self) {
+        if self.message_timeout.is_none() {
+            self.message_timeout(60);
+        }
+
+        if self.message_expiration.is_none() {
+            self.message_expiration(604800);
+        }
+
+        if self.queue_type.is_none() {
+            self.queue_type(QueueType::Pull);
+        }
+
+        match self.is_pull() {
+            Some(is_pull) => {
+                if !is_pull {
+                    match &mut self.push {
+                        Some(push) => {
+                            if push.retries.is_none() {
+                                push.retries(3);
+                            }
+
+                            if push.retries_delay.is_none() {
+                                push.retries_delay(60);
+                            }
+                        }
+                        None => (),
+                    };
+                };
+            }
+            None => (),
+        };
+    }
+
     pub fn name(&mut self, name: String) -> &mut QueueInfo {
         self.name = Some(name);
 
@@ -97,9 +131,7 @@ impl QueueInfo {
 
     pub fn is_pull(&mut self) -> Option<bool> {
         match &self.queue_type {
-            Some(queue_type) => {
-                Some(queue_type == &QueueType::Pull)
-            },
+            Some(queue_type) => Some(queue_type == &QueueType::Pull),
             None => None,
         }
     }
@@ -144,6 +176,20 @@ pub struct PushInfo {
     pub subscribers: Option<Vec<QueueSubscriber>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_queue: Option<String>,
+}
+
+impl PushInfo {
+    pub fn retries_delay(&mut self, retries_delay: u32) -> &mut PushInfo {
+        self.retries_delay = Some(retries_delay);
+
+        self
+    }
+
+    pub fn retries(&mut self, retries: u32) -> &mut PushInfo {
+        self.retries = Some(retries);
+
+        self
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -222,7 +268,7 @@ pub struct PushStatus {
     pub subscriber_name: String,
     pub retries_remaining: u32,
     pub tries: u32,
-	pub status_code: Option<u16>,
-	pub url: String,
+    pub status_code: Option<u16>,
+    pub url: String,
     pub msg: Option<String>
 }

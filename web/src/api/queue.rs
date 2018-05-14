@@ -56,6 +56,7 @@ pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
                 } else {
                     q = serde_json::from_value(v["queue"].clone()).unwrap();
                     q.name = Some(name);
+                    q.fill_missed_fields();
                 }
 
                 let (body, status_code): (Value, StatusCode) = match q.state() {
