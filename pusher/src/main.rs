@@ -127,6 +127,22 @@ fn update_push_status(push_message: PushMessage, subscriber: QueueSubscriber, st
     Ok(true)
 }
 
+fn call_delete_message(queue_name: String, message_id: String) {
+    let web_api_url = env::var("WEB_API_URL").expect("$WEB_API_URL is provided");
+    let path = format!("{}/queues/{}/messages/{}", web_api_url, queue_name, message_id);
+    info!("PATH: {:?}", path);
+
+    let reqwest_client = reqwest::Client::new();
+
+    let res = reqwest_client
+        .delete(path.as_str())
+        .headers(construct_headers(HashMap::new(), false))
+        .send()
+        .unwrap();
+
+    debug!("Deleted: {:#?}", res);
+}
+
 fn main() -> Result<(), Error> {
     env_logger::init();
 
@@ -192,6 +208,7 @@ fn main() -> Result<(), Error> {
 
                     if break_retry == true {
                         info!("No retry is required");
+                        call_delete_message(pm.queue_info.name.clone().unwrap(), msg.id.clone().unwrap());
                         break;
                     }
                     if retry.retry_count == i {
