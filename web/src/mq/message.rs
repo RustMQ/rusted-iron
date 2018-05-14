@@ -49,6 +49,8 @@ pub fn push_message(queue_name: String, message: Message, con: &Connection) -> R
                     .arg(&msg_id.to_string())
                     .arg("source_msg_id")
                     .arg(&oid.to_string())
+                    .arg("state")
+                    .arg(&msg.state.clone().unwrap().to_string())
                 .cmd("ZADD")
                     .arg(&queue_unreserved_key)
                     .arg(&msg_id.to_string())
