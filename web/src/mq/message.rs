@@ -131,6 +131,7 @@ pub fn delete_message(queue_name: &String, message: &Message, con: &Connection) 
         .zrem(&queue_reserved_key, &[&msg_key]).ignore()
         .zrem(&queue_unreserved_key, &[&msg_key]).ignore()
         .del(&msg_key)
+        .hincr(&queue_key, "size", -1).ignore()
         .query(con)?;
 
     Ok(true)
@@ -218,13 +219,13 @@ pub fn delete(queue_name: String, message_id: String, con: &Connection) -> Resul
 }
 
 pub fn delete_messages(queue_name: String, messages: &Vec<MessageDeleteBodyRequest>, con: &Connection) -> Result<Vec<bool>, Error> {
-    let mut res = Vec::new();
-
-    for m in messages {
-        res.push(delete(queue_name.to_string(), m.id.to_owned(), con)?);
-    }
-
-    Ok(res)
+    Ok(messages
+        .into_iter()
+        .map(|message| {
+            let deleted = delete(queue_name.to_string(), message.id.to_owned(), con).unwrap();
+            deleted
+        })
+        .collect())
 }
 
 pub fn touch_message(queue_id: &String, message_id: &String, reservation_id: &String, con: &Connection) -> Result<String, Error> {
