@@ -125,8 +125,8 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                         .into_iter()
                         .map(|msg| {
                             let m = Message::with_body(&msg.body);
-                            let mid = post_message(q.name.clone().unwrap(), m, &*connection).expect("Message put on queue.");
-                            mid.to_string()
+                            let mid = post_message(q.name.clone().unwrap(), m, &*connection).unwrap();
+                            mid
                         }).collect();
 
                     result
@@ -636,7 +636,7 @@ pub fn update_queue(mut state: State) -> Box<HandlerFuture> {
                 });
 
                 let status_code = match error_message.contains("subscriber") {
-                    true => StatusCode::BadRequest, 
+                    true => StatusCode::BadRequest,
                     false => StatusCode::Forbidden
                 };
 

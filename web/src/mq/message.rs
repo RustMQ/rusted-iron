@@ -21,7 +21,7 @@ pub struct ReserveMessageParams {
 
 pub const MAXIMUM_NUMBER_TO_PEEK: i32 = 1;
 
-pub fn push_message(queue_name: String, message: Message, con: &Connection) -> Result<i32, Error> {
+pub fn push_message(queue_name: String, message: Message, con: &Connection) -> Result<String, Error> {
     let queue_key: String = Queue::get_queue_key(&queue_name);
 
     let mut queue_unreserved_key = String::new();
@@ -36,19 +36,19 @@ pub fn push_message(queue_name: String, message: Message, con: &Connection) -> R
     let mut msg = Message::with_body(&message.body);
     let msg_id = redis::transaction(con, &[&msg_counter_key], |pipe| {
         let msg_id: i32 = con.get(&msg_counter_key)?;
-        msg_key.push_str(&msg_id.to_string());
-        let oid = ObjectId::new().unwrap();
-        msg.source_msg_id = Some(oid.clone().to_string());
-        let _response: Vec<String> = pipe
+        let id = ObjectId::new().unwrap();
+        msg_key.push_str(&id.to_string());
+        msg.source_msg_id = Some(id.clone().to_string());
+        let _response = pipe
                 .atomic()
                 .cmd("HMSET")
                     .arg(&msg_key)
                     .arg("body")
                     .arg(&message.body)
                     .arg("id")
-                    .arg(&msg_id.to_string())
+                    .arg(&id.to_string())
                     .arg("source_msg_id")
-                    .arg(&oid.to_string())
+                    .arg(&id.to_string())
                     .arg("state")
                     .arg(&msg.state.clone().unwrap().to_string())
                 .cmd("ZADD")
@@ -61,15 +61,20 @@ pub fn push_message(queue_name: String, message: Message, con: &Connection) -> R
                     .ignore()
                 .cmd("HINCRBY")
                     .arg(&queue_key)
-                    .arg("totalrecv")
-                    .arg("1")
+                    .arg("size")
+                    .arg(1)
+                    .ignore()
+                .cmd("HINCRBY")
+                    .arg(&queue_key)
+                    .arg("total_messages")
+                    .arg(1)
                     .ignore()
                 .query(con)?;
 
-        Ok(Some(msg_id))
+        Ok(Some(id.to_string()))
     }).unwrap();
 
-    msg.id = Some(msg_id.clone().to_string());
+    msg.id = Some(msg_id.clone());
     let queue = get_queue(&queue_name, &con)?;
     let qi_as_string = queue.value.expect("Queue Info should be present");
 
