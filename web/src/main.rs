@@ -71,7 +71,8 @@ fn router(pool: Pool) -> Router {
     let (pipelines, extended) = pipelines.add(
         new_pipeline()
             .add(redis_middleware.clone())
-            .add(AuthMiddleware)
+            // Disabled Auth
+            // .add(AuthMiddleware)
             .build()
     );
 
