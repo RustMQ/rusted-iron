@@ -1,3 +1,4 @@
+use std::fmt;
 use queue_info::QueueInfo;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -23,6 +24,15 @@ pub struct PushMessage {
 pub enum MessageState {
     Reserved,
     Unreserved
+}
+
+impl fmt::Display for MessageState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            MessageState::Unreserved => write!(f, "unreserved"),
+            MessageState::Reserved => write!(f, "reserved")
+        }
+    }
 }
 
 impl Message {
