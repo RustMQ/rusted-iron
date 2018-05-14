@@ -8,6 +8,13 @@ pub enum QueueType {
     Multicast
 }
 
+#[derive(Debug)]
+pub enum QueueState {
+    Valid,
+    TypeError,
+    SubscriberError
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct QueueInfo {
     #[serde(skip_serializing_if = "Option::is_none")] pub name: Option<String>,
@@ -86,6 +93,44 @@ impl QueueInfo {
         self.alerts = Some(alerts);
 
         self
+    }
+
+    pub fn is_pull(&mut self) -> Option<bool> {
+        match &self.queue_type {
+            Some(queue_type) => {
+                Some(queue_type == &QueueType::Pull)
+            },
+            None => None,
+        }
+    }
+
+    pub fn state(&mut self) -> QueueState {
+        match self.is_pull() {
+            Some(is_pull) => {
+                if is_pull {
+                    if self.push.is_some() {
+                        QueueState::TypeError
+                    } else {
+                        QueueState::Valid
+                    }
+                } else {
+                    match &self.push {
+                        Some(push) => match &push.subscribers {
+                            Some(subscribers) => {
+                                if subscribers.len() < 1 {
+                                    QueueState::SubscriberError
+                                } else {
+                                    QueueState::Valid
+                                }
+                            }
+                            None => QueueState::SubscriberError,
+                        },
+                        None => QueueState::SubscriberError,
+                    }
+                }
+            }
+            None => QueueState::TypeError,
+        }
     }
 }
 
