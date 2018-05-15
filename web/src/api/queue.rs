@@ -22,7 +22,7 @@ use mq::{
     queue::{create_queue, delete, get_queue, post_message, patch_queue_info}
 };
 use queue::{
-    queue_info::{QueueInfo, QueueSubscriber},
+    queue_info::{QueueInfo, QueueSubscriber, QueueState},
     message::*
 };
 
@@ -56,18 +56,35 @@ pub fn put_queue(mut state: State) -> Box<HandlerFuture> {
                 } else {
                     q = serde_json::from_value(v["queue"].clone()).unwrap();
                     q.name = Some(name);
+                    q.fill_missed_fields();
                 }
 
-                let mut queue = create_queue(q, &connection);
-                queue.project_id = Some(project_id);
-
-                let body = json!({
-                    "queue": queue
-                });
+                let (body, status_code): (Value, StatusCode) = match q.state() {
+                    QueueState::Valid => {
+                        let mut queue = create_queue(q, &connection);
+                        queue.project_id = Some(project_id);
+                        let body = json!({
+                            "queue": queue
+                        });
+                        (body, StatusCode::Ok)
+                    },
+                    QueueState::TypeError => {
+                        let body = json!({
+	                        "msg": "Queue type cannot be changed"
+                        });
+                        (body, StatusCode::Forbidden)
+                    },
+                    QueueState::SubscriberError => {
+                        let body = json!({
+	                        "msg": "Push queues must have at least one subscriber"
+                        });
+                        (body, StatusCode::BadRequest)
+                    }
+                };
 
                 let res = create_response(
                     &state,
-                    StatusCode::Ok,
+                    status_code,
                     Some((
                         body.to_string().into_bytes(),
                         mime::APPLICATION_JSON

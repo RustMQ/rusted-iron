@@ -1,11 +1,23 @@
 use std::collections::HashMap;
 
+const MESSAGE_TIMEOUT: u32 = 60;
+const MESSAGE_EXPIRATION: u32 = 604800;
+const RETRIES: u32 = 3;
+const RETRIES_DELAY: u32 = 60;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum QueueType {
     Pull,
     Unicast,
-    Multicast
+    Multicast,
+}
+
+#[derive(Debug)]
+pub enum QueueState {
+    Valid,
+    TypeError,
+    SubscriberError,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -42,14 +54,48 @@ impl QueueInfo {
         QueueInfo {
             name: Some(name),
             project_id: None,
-            message_timeout: Some(60),
-            message_expiration: Some(604800),
+            message_timeout: Some(MESSAGE_TIMEOUT),
+            message_expiration: Some(MESSAGE_EXPIRATION),
             queue_type: Some(QueueType::Pull),
             size: None,
             total_messages: None,
             push: None,
             alerts: None,
         }
+    }
+
+    pub fn fill_missed_fields(&mut self) {
+        if self.message_timeout.is_none() {
+            self.message_timeout(MESSAGE_TIMEOUT);
+        }
+
+        if self.message_expiration.is_none() {
+            self.message_expiration(MESSAGE_EXPIRATION);
+        }
+
+        if self.queue_type.is_none() {
+            self.queue_type(QueueType::Pull);
+        }
+
+        match self.is_pull() {
+            Some(is_pull) => {
+                if !is_pull {
+                    match &mut self.push {
+                        Some(push) => {
+                            if push.retries.is_none() {
+                                push.retries(RETRIES);
+                            }
+
+                            if push.retries_delay.is_none() {
+                                push.retries_delay(RETRIES_DELAY);
+                            }
+                        }
+                        None => (),
+                    };
+                };
+            }
+            None => (),
+        };
     }
 
     pub fn name(&mut self, name: String) -> &mut QueueInfo {
@@ -87,6 +133,42 @@ impl QueueInfo {
 
         self
     }
+
+    pub fn is_pull(&mut self) -> Option<bool> {
+        match &self.queue_type {
+            Some(queue_type) => Some(queue_type == &QueueType::Pull),
+            None => None,
+        }
+    }
+
+    pub fn state(&mut self) -> QueueState {
+        match self.is_pull() {
+            Some(is_pull) => {
+                if is_pull {
+                    if self.push.is_some() {
+                        QueueState::TypeError
+                    } else {
+                        QueueState::Valid
+                    }
+                } else {
+                    match &self.push {
+                        Some(push) => match &push.subscribers {
+                            Some(subscribers) => {
+                                if subscribers.len() < 1 {
+                                    QueueState::SubscriberError
+                                } else {
+                                    QueueState::Valid
+                                }
+                            }
+                            None => QueueState::SubscriberError,
+                        },
+                        None => QueueState::SubscriberError,
+                    }
+                }
+            }
+            None => QueueState::TypeError,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -99,6 +181,20 @@ pub struct PushInfo {
     pub subscribers: Option<Vec<QueueSubscriber>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_queue: Option<String>,
+}
+
+impl PushInfo {
+    pub fn retries_delay(&mut self, retries_delay: u32) -> &mut PushInfo {
+        self.retries_delay = Some(retries_delay);
+
+        self
+    }
+
+    pub fn retries(&mut self, retries: u32) -> &mut PushInfo {
+        self.retries = Some(retries);
+
+        self
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -177,7 +273,7 @@ pub struct PushStatus {
     pub subscriber_name: String,
     pub retries_remaining: u32,
     pub tries: u32,
-	pub status_code: Option<u16>,
-	pub url: String,
+    pub status_code: Option<u16>,
+    pub url: String,
     pub msg: Option<String>
 }
