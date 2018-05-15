@@ -1,5 +1,10 @@
 use std::collections::HashMap;
 
+const MESSAGE_TIMEOUT: u32 = 60;
+const MESSAGE_EXPIRATION: u32 = 604800;
+const RETRIES: u32 = 3;
+const RETRIES_DELAY: u32 = 60;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum QueueType {
@@ -49,8 +54,8 @@ impl QueueInfo {
         QueueInfo {
             name: Some(name),
             project_id: None,
-            message_timeout: Some(60),
-            message_expiration: Some(604800),
+            message_timeout: Some(MESSAGE_TIMEOUT),
+            message_expiration: Some(MESSAGE_EXPIRATION),
             queue_type: Some(QueueType::Pull),
             size: None,
             total_messages: None,
@@ -61,11 +66,11 @@ impl QueueInfo {
 
     pub fn fill_missed_fields(&mut self) {
         if self.message_timeout.is_none() {
-            self.message_timeout(60);
+            self.message_timeout(MESSAGE_TIMEOUT);
         }
 
         if self.message_expiration.is_none() {
-            self.message_expiration(604800);
+            self.message_expiration(MESSAGE_EXPIRATION);
         }
 
         if self.queue_type.is_none() {
@@ -78,11 +83,11 @@ impl QueueInfo {
                     match &mut self.push {
                         Some(push) => {
                             if push.retries.is_none() {
-                                push.retries(3);
+                                push.retries(RETRIES);
                             }
 
                             if push.retries_delay.is_none() {
-                                push.retries_delay(60);
+                                push.retries_delay(RETRIES_DELAY);
                             }
                         }
                         None => (),
