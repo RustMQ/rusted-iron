@@ -153,19 +153,19 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
     queue_reserved_key.push_str(":reserved:msg");
 
     let unreserved_msg_key_list: Result<Vec<(String, isize)>, RedisError> = con.zrangebyscore_limit_withscores(&queue_unreserved_key, "0", "+inf", 0, reserve_params.n as isize);
-    let mut message_list_for_move = Vec::new();
-    let mut message_list_for_delete = Vec::new();
+    let mut reserved_msg_list = Vec::new();
+    let mut unreserved_msg_list = Vec::new();
     match unreserved_msg_key_list {
         Ok(unreserved_msg_key_list) => {
             for msg_key in unreserved_msg_key_list {
-                message_list_for_move.push((msg_key.1.clone(), msg_key.0.clone()));
-                message_list_for_delete.push(msg_key.0.clone());
+                reserved_msg_list.push((msg_key.1.clone(), msg_key.0.clone()));
+                unreserved_msg_list.push(msg_key.0.clone());
             };
         },
         Err(err) => println!("Error: {:?}", err),
     }
 
-    if message_list_for_move.is_empty() {
+    if reserved_msg_list.is_empty() {
         return Ok(result)
     }
 
@@ -173,24 +173,28 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
     let _r: Vec<isize> = redis::transaction(con, &[&queue_unreserved_key, &queue_reserved_key], |pipe| {
         pipe
             .atomic()
-            .zrem(&queue_unreserved_key.clone(), message_list_for_delete.clone()).ignore()
-            .zadd_multiple(&queue_reserved_key.clone(), &message_list_for_move)
+            .zrem(&queue_unreserved_key.clone(), unreserved_msg_list.clone()).ignore()
+            .zadd_multiple(&queue_reserved_key.clone(), &reserved_msg_list)
             .query(con)
     }).unwrap();
 
     // 2. Loop over reserved (per n in request)
-    for rm in message_list_for_delete.clone() {
-        let oid: ObjectId = ObjectId::new().unwrap();
-        let _r: Vec<isize> = redis::transaction(con, &[rm.clone()], |pipe| {
+    for unreserved_msg_key in unreserved_msg_list.clone() {
+        info!("M: {:?}", unreserved_msg_key);
+        let id: ObjectId = ObjectId::new().unwrap();
+        let _r: Vec<isize> = redis::transaction(con, &[unreserved_msg_key.clone()], |pipe| {
     // 2.2. update msg --> TX (?)
             pipe
                 .atomic()
-                .hset_nx(rm.clone(), "reservation_id", oid.to_string())
+                .hset_nx(unreserved_msg_key.clone(), "reservation_id", id.to_string())
+
+                .hset(unreserved_msg_key.clone(), "state", MessageState::Reserved.to_string()).ignore()
+                .hincr(unreserved_msg_key.clone(), "reserved_count", 1).ignore()
                 .query(con)
         }).unwrap();
     };
     // 3. collect updated msgs
-    for updated_msg_key in message_list_for_delete.clone() {
+    for updated_msg_key in unreserved_msg_list.clone() {
         let v: Value = con.hgetall(&updated_msg_key)?;
         result.push(v.deserialize()?);
     };
