@@ -243,13 +243,13 @@ pub fn touch_message(queue_id: &String, message_id: &String, reservation_id: &St
     };
 
     if current_reservation_id != reservation_id.to_string() {
-        return Ok(String::new())
+        bail!("Touch message was failed");
     }
 
-    let oid: ObjectId = ObjectId::new().unwrap();
-    let _: isize = cmd("HSET").arg(msg_key).arg("reservation_id").arg(oid.to_string()).query(con).unwrap();
+    let id: ObjectId = ObjectId::new().unwrap();
+    let _: isize = con.hset(msg_key, "reservation_id", id.to_string())?;
 
-    Ok(oid.to_string())
+    Ok(id.to_string())
 }
 
 pub fn peek_messages(queue_name: &String, number_to_peek: &i32, con: &Connection) -> Result<Vec<Message>, Error> {
@@ -305,15 +305,15 @@ pub fn release_message(queue_name: &String, message_id: &String, reservation_id:
         return Ok(false)
     }
 
-    let msg_score: i32 = cmd("ZSCORE").arg(&queue_reserved_key).arg(&msg_key).query(con).unwrap();
+    let msg_score: i32 = con.zscore(&queue_reserved_key, &msg_key)?;
 
     let mut pipe = pipe();
 
-    pipe.zrem(&queue_reserved_key, &msg_key).ignore();
-    pipe.zadd(&queue_unreserved_key, &msg_key, msg_score).ignore();
-    pipe.hdel(&msg_key, "reservation_id");
-
-    let (res,): (i32,) = pipe.query(con).unwrap();
+    let res: i32 = pipe
+        .zrem(&queue_reserved_key, &msg_key).ignore()
+        .zadd(&queue_unreserved_key, &msg_key, msg_score).ignore()
+        .hdel(&msg_key, "reservation_id")
+        .query(con)?;
 
     if res == 1 {
         return Ok(true)
