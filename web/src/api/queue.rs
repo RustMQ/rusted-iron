@@ -514,16 +514,18 @@ pub fn delete_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
-                let body = match ::mq::queue::delete_subscribers(name, subscribers, &connection) {
+                let (status_code, body) = match ::mq::queue::delete_subscribers(name, subscribers, &connection) {
                     Ok(updated) => {
                         if updated {
-                            json!({
+                            let body = json!({
                                 "msg": String::from("Updated")
-                            })
+                            });
+                            (StatusCode::Ok, body)
                         } else {
-                            json!({
-                                "msg": String::from("Not Updated")
-                            })
+                            let body = json!({
+                                "msg": String::from("Push queues must have at least one subscriber")
+                            });
+                            (StatusCode::BadRequest, body)
                         }
                     },
                     Err(_e) => {
@@ -534,7 +536,7 @@ pub fn delete_subscribers(mut state: State) -> Box<HandlerFuture> {
 
                 let res = create_response(
                     &state,
-                    StatusCode::Ok,
+                    status_code,
                     Some((
                         body.to_string().into_bytes(),
                         mime::APPLICATION_JSON
