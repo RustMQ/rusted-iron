@@ -1,0 +1,41 @@
+version: '3'
+services:
+  redis:
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    container_name: rust-redis
+    image: redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+  web:
+    env_file:
+      - env.list
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+
+    healthcheck:
+      test: ["CMD", "curl", "f", "http://0.0.0.0:8000"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - pusher
+
+  pusher:
+    env_file:
+        - env.list
+    build:
+      context: .
+      dockerfile: Dockerfile.pusher
+    ports:
+    - "8080:8080"
+    depends_on:
+      - redis

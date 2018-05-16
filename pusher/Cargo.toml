@@ -1,0 +1,16 @@
+[package]
+name = "pusher"
+version = "0.1.0"
+authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
+
+[dependencies]
+redis = "0.8"
+serde_json = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
+reqwest = "0.8"
+log = "0.4"
+env_logger = "0.5"
+base64 = "0.9"
+failure = "0.1"
+queue = { path = "../queue" }
