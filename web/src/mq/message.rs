@@ -180,14 +180,12 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
 
     // 2. Loop over reserved (per n in request)
     for unreserved_msg_key in unreserved_msg_list.clone() {
-        info!("M: {:?}", unreserved_msg_key);
         let id: ObjectId = ObjectId::new().unwrap();
         let _r: Vec<isize> = redis::transaction(con, &[unreserved_msg_key.clone()], |pipe| {
     // 2.2. update msg --> TX (?)
             pipe
                 .atomic()
                 .hset_nx(unreserved_msg_key.clone(), "reservation_id", id.to_string())
-
                 .hset(unreserved_msg_key.clone(), "state", MessageState::Reserved.to_string()).ignore()
                 .hincr(unreserved_msg_key.clone(), "reserved_count", 1).ignore()
                 .query(con)
@@ -316,6 +314,7 @@ pub fn release_message(queue_name: &String, message_id: &String, reservation_id:
     let res: i32 = pipe
         .zrem(&queue_reserved_key, &msg_key).ignore()
         .zadd(&queue_unreserved_key, &msg_key, msg_score).ignore()
+        .hset(&msg_key, "state", MessageState::Unreserved.to_string()).ignore()
         .hdel(&msg_key, "reservation_id")
         .query(con)?;
 
