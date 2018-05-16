@@ -21,7 +21,7 @@ pub struct ReserveMessageParams {
 
 pub const MAXIMUM_NUMBER_TO_PEEK: i32 = 1;
 
-pub fn push_message(queue_name: String, message: Message, con: &Connection) -> Result<i32, Error> {
+pub fn push_message(queue_name: String, message: Message, con: &Connection) -> Result<String, Error> {
     let queue_key: String = Queue::get_queue_key(&queue_name);
 
     let mut queue_unreserved_key = String::new();
@@ -36,19 +36,21 @@ pub fn push_message(queue_name: String, message: Message, con: &Connection) -> R
     let mut msg = Message::with_body(&message.body);
     let msg_id = redis::transaction(con, &[&msg_counter_key], |pipe| {
         let msg_id: i32 = con.get(&msg_counter_key)?;
-        msg_key.push_str(&msg_id.to_string());
-        let oid = ObjectId::new().unwrap();
-        msg.source_msg_id = Some(oid.clone().to_string());
-        let _response: Vec<String> = pipe
+        let id = ObjectId::new().unwrap();
+        msg_key.push_str(&id.to_string());
+        msg.source_msg_id = Some(id.clone().to_string());
+        let _response = pipe
                 .atomic()
                 .cmd("HMSET")
                     .arg(&msg_key)
                     .arg("body")
                     .arg(&message.body)
                     .arg("id")
-                    .arg(&msg_id.to_string())
+                    .arg(&id.to_string())
                     .arg("source_msg_id")
-                    .arg(&oid.to_string())
+                    .arg(&id.to_string())
+                    .arg("state")
+                    .arg(&msg.state.clone().unwrap().to_string())
                 .cmd("ZADD")
                     .arg(&queue_unreserved_key)
                     .arg(&msg_id.to_string())
@@ -59,15 +61,20 @@ pub fn push_message(queue_name: String, message: Message, con: &Connection) -> R
                     .ignore()
                 .cmd("HINCRBY")
                     .arg(&queue_key)
-                    .arg("totalrecv")
-                    .arg("1")
+                    .arg("size")
+                    .arg(1)
+                    .ignore()
+                .cmd("HINCRBY")
+                    .arg(&queue_key)
+                    .arg("total_messages")
+                    .arg(1)
                     .ignore()
                 .query(con)?;
 
-        Ok(Some(msg_id))
+        Ok(Some(id.to_string()))
     }).unwrap();
 
-    msg.id = Some(msg_id.clone().to_string());
+    msg.id = Some(msg_id.clone());
     let queue = get_queue(&queue_name, &con)?;
     let qi_as_string = queue.value.expect("Queue Info should be present");
 
@@ -124,6 +131,7 @@ pub fn delete_message(queue_name: &String, message: &Message, con: &Connection) 
         .zrem(&queue_reserved_key, &[&msg_key]).ignore()
         .zrem(&queue_unreserved_key, &[&msg_key]).ignore()
         .del(&msg_key)
+        .hincr(&queue_key, "size", -1).ignore()
         .query(con)?;
 
     Ok(true)
@@ -145,19 +153,19 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
     queue_reserved_key.push_str(":reserved:msg");
 
     let unreserved_msg_key_list: Result<Vec<(String, isize)>, RedisError> = con.zrangebyscore_limit_withscores(&queue_unreserved_key, "0", "+inf", 0, reserve_params.n as isize);
-    let mut message_list_for_move = Vec::new();
-    let mut message_list_for_delete = Vec::new();
+    let mut reserved_msg_list = Vec::new();
+    let mut unreserved_msg_list = Vec::new();
     match unreserved_msg_key_list {
         Ok(unreserved_msg_key_list) => {
             for msg_key in unreserved_msg_key_list {
-                message_list_for_move.push((msg_key.1.clone(), msg_key.0.clone()));
-                message_list_for_delete.push(msg_key.0.clone());
+                reserved_msg_list.push((msg_key.1.clone(), msg_key.0.clone()));
+                unreserved_msg_list.push(msg_key.0.clone());
             };
         },
         Err(err) => println!("Error: {:?}", err),
     }
 
-    if message_list_for_move.is_empty() {
+    if reserved_msg_list.is_empty() {
         return Ok(result)
     }
 
@@ -165,24 +173,26 @@ pub fn reserve_messages(queue_name: &String, reserve_params: &ReserveMessagePara
     let _r: Vec<isize> = redis::transaction(con, &[&queue_unreserved_key, &queue_reserved_key], |pipe| {
         pipe
             .atomic()
-            .zrem(&queue_unreserved_key.clone(), message_list_for_delete.clone()).ignore()
-            .zadd_multiple(&queue_reserved_key.clone(), &message_list_for_move)
+            .zrem(&queue_unreserved_key.clone(), unreserved_msg_list.clone()).ignore()
+            .zadd_multiple(&queue_reserved_key.clone(), &reserved_msg_list)
             .query(con)
     }).unwrap();
 
     // 2. Loop over reserved (per n in request)
-    for rm in message_list_for_delete.clone() {
-        let oid: ObjectId = ObjectId::new().unwrap();
-        let _r: Vec<isize> = redis::transaction(con, &[rm.clone()], |pipe| {
+    for unreserved_msg_key in unreserved_msg_list.clone() {
+        let id: ObjectId = ObjectId::new().unwrap();
+        let _r: Vec<isize> = redis::transaction(con, &[unreserved_msg_key.clone()], |pipe| {
     // 2.2. update msg --> TX (?)
             pipe
                 .atomic()
-                .hset_nx(rm.clone(), "reservation_id", oid.to_string())
+                .hset_nx(unreserved_msg_key.clone(), "reservation_id", id.to_string())
+                .hset(unreserved_msg_key.clone(), "state", MessageState::Reserved.to_string()).ignore()
+                .hincr(unreserved_msg_key.clone(), "reserved_count", 1).ignore()
                 .query(con)
         }).unwrap();
     };
     // 3. collect updated msgs
-    for updated_msg_key in message_list_for_delete.clone() {
+    for updated_msg_key in unreserved_msg_list.clone() {
         let v: Value = con.hgetall(&updated_msg_key)?;
         result.push(v.deserialize()?);
     };
@@ -211,13 +221,13 @@ pub fn delete(queue_name: String, message_id: String, con: &Connection) -> Resul
 }
 
 pub fn delete_messages(queue_name: String, messages: &Vec<MessageDeleteBodyRequest>, con: &Connection) -> Result<Vec<bool>, Error> {
-    let mut res = Vec::new();
-
-    for m in messages {
-        res.push(delete(queue_name.to_string(), m.id.to_owned(), con)?);
-    }
-
-    Ok(res)
+    Ok(messages
+        .into_iter()
+        .map(|message| {
+            let deleted = delete(queue_name.to_string(), message.id.to_owned(), con).unwrap();
+            deleted
+        })
+        .collect())
 }
 
 pub fn touch_message(queue_id: &String, message_id: &String, reservation_id: &String, con: &Connection) -> Result<String, Error> {
@@ -235,13 +245,13 @@ pub fn touch_message(queue_id: &String, message_id: &String, reservation_id: &St
     };
 
     if current_reservation_id != reservation_id.to_string() {
-        return Ok(String::new())
+        bail!("Touch message was failed");
     }
 
-    let oid: ObjectId = ObjectId::new().unwrap();
-    let _: isize = cmd("HSET").arg(msg_key).arg("reservation_id").arg(oid.to_string()).query(con).unwrap();
+    let id: ObjectId = ObjectId::new().unwrap();
+    let _: isize = con.hset(msg_key, "reservation_id", id.to_string())?;
 
-    Ok(oid.to_string())
+    Ok(id.to_string())
 }
 
 pub fn peek_messages(queue_name: &String, number_to_peek: &i32, con: &Connection) -> Result<Vec<Message>, Error> {
@@ -297,15 +307,16 @@ pub fn release_message(queue_name: &String, message_id: &String, reservation_id:
         return Ok(false)
     }
 
-    let msg_score: i32 = cmd("ZSCORE").arg(&queue_reserved_key).arg(&msg_key).query(con).unwrap();
+    let msg_score: i32 = con.zscore(&queue_reserved_key, &msg_key)?;
 
     let mut pipe = pipe();
 
-    pipe.zrem(&queue_reserved_key, &msg_key).ignore();
-    pipe.zadd(&queue_unreserved_key, &msg_key, msg_score).ignore();
-    pipe.hdel(&msg_key, "reservation_id");
-
-    let (res,): (i32,) = pipe.query(con).unwrap();
+    let res: i32 = pipe
+        .zrem(&queue_reserved_key, &msg_key).ignore()
+        .zadd(&queue_unreserved_key, &msg_key, msg_score).ignore()
+        .hset(&msg_key, "state", MessageState::Unreserved.to_string()).ignore()
+        .hdel(&msg_key, "reservation_id")
+        .query(con)?;
 
     if res == 1 {
         return Ok(true)

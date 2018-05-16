@@ -50,7 +50,7 @@ pub fn get_message_counter_key(queue_id: &String) -> String {
     key
 }
 
-pub fn post_message(queue_name: String, message: Message, con: &Connection) -> Result<i32, Error> {
+pub fn post_message(queue_name: String, message: Message, con: &Connection) -> Result<String, Error> {
     Ok(push_message(queue_name, message, con)?)
 }
 
@@ -69,9 +69,9 @@ pub fn create_queue(queue_info: QueueInfo, con: &Connection) -> QueueInfo {
         .arg(serde_json::to_string(&queue_info).unwrap())
         .arg("created_at".to_string())
         .arg(serde_json::to_string(&now).unwrap())
-        .arg("totalrecv".to_string())
+        .arg("size".to_string())
         .arg(0)
-        .arg("totalsent".to_string())
+        .arg("total_messages".to_string())
         .arg(0).ignore();
     queue_key.push_str(":msg:counter");
     let _: Vec<String> = pipe.cmd("SET").arg(queue_key).arg(0).query(con).unwrap();

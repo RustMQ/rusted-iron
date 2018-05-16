@@ -2,8 +2,8 @@
 pub struct Queue {
     pub name: Option<String>,
     pub value: Option<String>,
-    pub totalrecv: Option<i32>,
-    pub totalsent: Option<i32>
+    pub size: Option<usize>,
+    pub total_messages: Option<usize>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -18,8 +18,8 @@ impl Queue {
         Queue {
             name: None,
             value: None,
-            totalrecv: None,
-            totalsent: None
+            size: None,
+            total_messages: None
         }
     }
 
