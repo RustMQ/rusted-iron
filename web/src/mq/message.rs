@@ -7,7 +7,7 @@ use serde_redis::RedisDeserialize;
 use api::message::MessageDeleteBodyRequest;
 use mq::queue::*;
 use queue::{
-    message::*,
+    message::{Message, MessageState, PushMessage},
     queue::Queue,
     queue_info::{QueueInfo, QueueType, PushStatus}
 };

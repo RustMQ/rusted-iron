@@ -26,7 +26,7 @@ pub fn delete(mut state: State) -> Box<HandlerFuture> {
         let f = Body::take_from(&mut state)
             .concat2()
             .then(|full_body| match full_body {
-                Ok(_valid_body) => {
+                Ok(valid_body) => {
                     let connection = {
                         let redis_pool = RedisPool::borrow_mut_from(&mut state);
                         let connection = redis_pool.conn().unwrap();
@@ -38,28 +38,58 @@ pub fn delete(mut state: State) -> Box<HandlerFuture> {
                         (path.name.clone().unwrap(), path.message_id.clone().unwrap())
                     };
 
-                    match ::mq::message::delete(queue_name, message_id, &connection) {
-                        Ok(_deleted) => {
-                            let body = json!({
-                                "msg": "Deleted"
-                            });
-
-                            let res = create_response(
-                                &state,
-                                StatusCode::Ok,
-                                Some((
-                                    body.to_string().into_bytes(),
-                                    mime::APPLICATION_JSON
-                                ))
-                            );
-
-                            return future::ok((state, res));
+                    let request_body :Result<Value, serde_json::Error> = serde_json::from_slice(&valid_body.to_vec());
+                    let message = ::mq::message::get_message(&queue_name, &message_id, &connection);
+                    let is_reserved = match &message {
+                        Ok(message) => {
+                            match message.is_reserved() {
+                                Some(is_reserved) => is_reserved,
+                                None => false,
+                            }
                         },
-                        Err(_e) => {
-                            let res = create_response(&state, StatusCode::NotFound, None);
-                            return future::ok((state, res));
+                        Err(_) => false,
+                    };
+
+                    let (response_message, status_code) = match request_body {
+                        Ok(request_body) => {
+                            let is_valid = if is_reserved {
+                                let message_reservation_id = message.unwrap().reservation_id.unwrap();
+                                request_body["reservation_id"].as_str().unwrap() == &message_reservation_id
+                            } else {
+                                true
+                            };
+
+                            match is_valid {
+                                true =>{
+                                    match ::mq::message::delete(queue_name, message_id, &connection) {
+                                        Ok(_deleted) => ("Deleted", StatusCode::Ok),
+                                        Err(e) => {
+                                            let res = create_response(&state, StatusCode::NotFound, None);
+                                            return future::ok((state, res));
+                                        }
+                                    }
+                                },
+                                false => ("A reservation_id is required", StatusCode::BadRequest)
+                            }
+                        },
+                        Err(_) => {
+                            ("Failed to decode JSON.", StatusCode::BadRequest)
                         }
-                    }
+                    };
+
+                    let body = json!({
+                        "msg": response_message
+                    });
+
+                    let res = create_response(
+                        &state,
+                        status_code,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        ))
+                    );
+                    return future::ok((state, res));
                 },
                 Err(e) => future::err((state, e.into_handler_error()))
             });
