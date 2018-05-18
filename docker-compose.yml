@@ -37,7 +37,5 @@ services:
       context: .
       dockerfile: Dockerfile.pusher
     image: rustmq/pusher
-    ports:
-    - "8080:8080"
     depends_on:
       - redis
