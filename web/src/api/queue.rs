@@ -120,14 +120,21 @@ pub fn push_messages(mut state: State) -> Box<HandlerFuture> {
                         serde_json::from_value(body_content["messages"].clone()).unwrap()
                     };
 
-                    let q = get_queue(&name, &connection).unwrap();
-                    let mut result: Vec<String> = messages
-                        .into_iter()
-                        .map(|msg| {
-                            let m = Message::with_body(&msg.body);
-                            let mid = post_message(q.name.clone().unwrap(), m, &*connection).unwrap();
-                            mid
-                        }).collect();
+                    let result: Vec<String> = match get_queue(&name, &connection) {
+                        Ok(q) => {
+                            messages
+                                .into_iter()
+                                .map(|msg| {
+                                    let m = Message::with_body(&msg.body);
+                                    let mid = post_message(q.name.clone().unwrap(), m, &*connection).unwrap();
+                                    mid
+                                }).collect()
+                        },
+                        Err(err) => {
+                            debug!("Error: {:#?}", err);
+                            Vec::new()
+                        }
+                    };
 
                     result
                 };

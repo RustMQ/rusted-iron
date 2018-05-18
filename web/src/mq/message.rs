@@ -127,12 +127,14 @@ pub fn delete_message(queue_name: &String, message: &Message, con: &Connection) 
     msg_key.push_str(":msg:");
     msg_key.push_str(&message.id.clone().unwrap());
 
-    let _ : Vec<bool> = pipe()
+    let deleted: isize = pipe()
         .zrem(&queue_reserved_key, &[&msg_key]).ignore()
         .zrem(&queue_unreserved_key, &[&msg_key]).ignore()
         .del(&msg_key)
-        .hincr(&queue_key, "size", -1).ignore()
         .query(con)?;
+    if deleted == 1 {
+        con.hincr(&queue_key, "size", -1)?;
+    }
 
     Ok(true)
 }
