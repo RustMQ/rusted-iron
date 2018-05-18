@@ -6,17 +6,18 @@ services:
       interval: 1s
       timeout: 3s
       retries: 30
-    container_name: rust-redis
+    container_name: redis
     image: redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
   web:
     env_file:
-      - env.list
+      - env.web.list
     build:
       context: .
       dockerfile: Dockerfile.web
+    image: rustmq/web
 
     healthcheck:
       test: ["CMD", "curl", "f", "http://0.0.0.0:8000"]
@@ -31,10 +32,11 @@ services:
 
   pusher:
     env_file:
-        - env.list
+        - env.pusher.list
     build:
       context: .
       dockerfile: Dockerfile.pusher
+    image: rustmq/pusher
     ports:
     - "8080:8080"
     depends_on:
