@@ -16,6 +16,7 @@ use gotham::{
 use middleware::redis::RedisPool;
 use api::queue::QueuePathExtractor;
 use mq::message::{MAXIMUM_NUMBER_TO_PEEK};
+use queue::message::Message;
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct QueryStringExtractor {
@@ -99,7 +100,30 @@ pub fn delete(mut state: State) -> Box<HandlerFuture> {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MessageDeleteBodyRequest{
-    pub id: String
+    pub id: String,
+    pub reservation_id: Option<String>
+}
+
+impl MessageDeleteBodyRequest {
+    pub fn is_valid_for(&self, message: &Message) -> bool {
+        let is_reserved = match message.is_reserved() {
+            Some(is_reserved) => is_reserved,
+            None => false,
+        };
+
+        let is_valid = if is_reserved {
+            match &self.reservation_id {
+                Some(reservation_id) => {
+                    reservation_id == &message.clone().reservation_id.unwrap()
+                },
+                None => false,
+            }
+        } else {
+            true
+        };
+
+        is_valid
+    }
 }
 
 pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
@@ -155,6 +179,32 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
                     }
 
                     let messages: Vec<MessageDeleteBodyRequest> = serde_json::from_value(body_content["ids"].clone()).unwrap();
+                    
+                    let queue = queue_name.clone();
+                    let mut invalid_messages = messages.clone().into_iter().filter(|req_message| {
+                        let message = ::mq::message::get_message(&queue, &req_message.id, &connection);
+                        !req_message.is_valid_for(&message.unwrap())
+                    });
+
+                    match invalid_messages.next() {
+                        Some(_invalid_message) => {
+                            let body = json!({
+                                "msg": "A reservation_id is required"
+                            });
+
+                            let res = create_response(
+                                &state,
+                                StatusCode::BadRequest,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
+
+                            return future::ok((state, res));
+                        },
+                        None => (),
+                    };
 
                     match ::mq::message::delete_messages(queue_name, &messages, &connection) {
                         Ok(_deleted) => {
