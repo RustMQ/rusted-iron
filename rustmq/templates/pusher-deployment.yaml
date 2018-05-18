@@ -1,0 +1,52 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Program Files\kompose\kompose.exe convert -c
+    kompose.version: 1.13.0 (84fa826)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: pusher
+  name: pusher
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: pusher
+    spec:
+      containers:
+      - env:
+        - name: REDISCLOUD_URL
+          valueFrom:
+            configMapKeyRef:
+              key: REDISCLOUD_URL
+              name: pusher-env-pusher-list
+        - name: REDIS_CONNECTION_MAX_SIZE
+          valueFrom:
+            configMapKeyRef:
+              key: REDIS_CONNECTION_MAX_SIZE
+              name: pusher-env-pusher-list
+        - name: RUST_BACKTRACE
+          valueFrom:
+            configMapKeyRef:
+              key: RUST_BACKTRACE
+              name: pusher-env-pusher-list
+        - name: RUST_LOG
+          valueFrom:
+            configMapKeyRef:
+              key: RUST_LOG
+              name: pusher-env-pusher-list
+        - name: WEB_API_URL
+          valueFrom:
+            configMapKeyRef:
+              key: WEB_API_URL
+              name: pusher-env-pusher-list
+        image: rustmq/pusher
+        imagePullPolicy: IfNotPresent
+        name: pusher
+        resources: {}
+      restartPolicy: Always
+status: {}

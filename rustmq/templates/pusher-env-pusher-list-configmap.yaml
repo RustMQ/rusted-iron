@@ -1,0 +1,13 @@
+apiVersion: v1
+data:
+  REDIS_CONNECTION_MAX_SIZE: "256"
+  REDISCLOUD_URL: redis://redis:6379
+  RUST_BACKTRACE: full
+  RUST_LOG: info
+  WEB_API_URL: http://rusted-iron-web:8000
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: pusher-env-pusher-list
+  name: pusher-env-pusher-list

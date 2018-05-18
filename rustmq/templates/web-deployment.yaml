@@ -1,0 +1,63 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Program Files\kompose\kompose.exe convert -c
+    kompose.version: 1.13.0 (84fa826)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: web
+  name: web
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: web
+    spec:
+      containers:
+      - env:
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              key: PORT
+              name: web-env-web-list
+        - name: REDISCLOUD_URL
+          valueFrom:
+            configMapKeyRef:
+              key: REDISCLOUD_URL
+              name: web-env-web-list
+        - name: REDIS_CONNECTION_MAX_SIZE
+          valueFrom:
+            configMapKeyRef:
+              key: REDIS_CONNECTION_MAX_SIZE
+              name: web-env-web-list
+        - name: RUST_BACKTRACE
+          valueFrom:
+            configMapKeyRef:
+              key: RUST_BACKTRACE
+              name: web-env-web-list
+        - name: RUST_LOG
+          valueFrom:
+            configMapKeyRef:
+              key: RUST_LOG
+              name: web-env-web-list
+        image: rustmq/web
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - curl
+            - f
+            - http://0.0.0.0:8000
+          failureThreshold: 60
+          periodSeconds: 1
+          timeoutSeconds: 3
+        name: web
+        ports:
+        - containerPort: 8000
+        resources: {}
+      restartPolicy: Always
+status: {}
