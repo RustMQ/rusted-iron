@@ -458,6 +458,21 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                     serde_json::from_value(body_content["subscribers"].clone()).unwrap()
                 };
 
+                if subscribers.is_empty() {
+                    let body = json!({
+                        "msg": "Push queues must have at least one subscriber"
+                    });
+                    let res = create_response(
+                        &state,
+                        StatusCode::BadRequest,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        )),
+                    );
+
+                    return future::ok((state, res));
+                };
 
                 let body = match ::mq::queue::replace_subscribers(name, subscribers, &connection) {
                     Ok(updated) => {
