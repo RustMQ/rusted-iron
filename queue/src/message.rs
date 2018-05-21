@@ -13,6 +13,15 @@ pub struct Message {
     pub state: Option<MessageState>
 }
 
+impl Message {
+    pub fn is_reserved(&self) -> Option<bool> {
+        match &self.state {
+            Some(state) => Some(state == &MessageState::Reserved),
+            None => None
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PushMessage {
     pub queue_info: QueueInfo,
