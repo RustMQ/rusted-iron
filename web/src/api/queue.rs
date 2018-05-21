@@ -454,8 +454,43 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                 };
 
                 let mut subscribers: Vec<QueueSubscriber> = {
-                    let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
-                    serde_json::from_value(body_content["subscribers"].clone()).unwrap()
+                    let body_content: Value = match serde_json::from_slice(&valid_body.to_vec()) {
+                        Ok(body_content) => body_content,
+                        Err(_) => {
+                            let body = json!({
+                                "msg": "Failed to decode JSON."
+                            });
+                            let res = create_response(
+                            &state,
+                            StatusCode::BadRequest,
+                            Some((
+                                body.to_string().into_bytes(),
+                                mime::APPLICATION_JSON
+                                )),
+                            );
+
+                            return future::ok((state, res));
+                        }
+                    };
+                    
+                    match serde_json::from_value(body_content["subscribers"].clone()) {
+                        Ok(subscribers) => subscribers,
+                        Err(_) => {
+                            let body = json!({
+                                "msg": "Failed to decode JSON."
+                            });
+                            let res = create_response(
+                            &state,
+                            StatusCode::BadRequest,
+                            Some((
+                                body.to_string().into_bytes(),
+                                mime::APPLICATION_JSON
+                            )),
+                        );
+
+                        return future::ok((state, res));
+                        }
+                    }
                 };
 
                 if subscribers.is_empty() {
