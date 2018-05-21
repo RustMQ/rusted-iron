@@ -41,41 +41,30 @@ pub fn delete(mut state: State) -> Box<HandlerFuture> {
 
                     let request_body :Result<Value, serde_json::Error> = serde_json::from_slice(&valid_body.to_vec());
                     let message = ::mq::message::get_message(&queue_name, &message_id, &connection);
-                    let is_reserved = match &message {
+
+                    let (response_message, status_code) = match &message {
                         Ok(message) => {
-                            match message.is_reserved() {
-                                Some(is_reserved) => is_reserved,
-                                None => false,
-                            }
-                        },
-                        Err(_) => false,
-                    };
-
-                    let (response_message, status_code) = match request_body {
-                        Ok(request_body) => {
-                            let is_valid = if is_reserved {
-                                let message_reservation_id = message.unwrap().reservation_id.unwrap();
-                                request_body["reservation_id"].as_str().unwrap() == &message_reservation_id
-                            } else {
-                                true
-                            };
-
-                            match is_valid {
-                                true =>{
-                                    match ::mq::message::delete(queue_name, message_id, &connection) {
-                                        Ok(_deleted) => ("Deleted", StatusCode::Ok),
-                                        Err(e) => {
-                                            let res = create_response(&state, StatusCode::NotFound, None);
-                                            return future::ok((state, res));
-                                        }
-                                    }
+                            match request_body {
+                                Ok(request_body) => {
+                                    let reservation_id = request_body["reservation_id"].as_str().unwrap_or("");
+                                    let request_message = MessageDeleteBodyRequest {
+                                        id: message_id.clone(),
+                                        reservation_id: Some(reservation_id.to_string()),
+                                    };
+                                    match request_message.is_valid_for(&message) {
+                                                true => {
+                                                    match ::mq::message::delete(queue_name, message_id, &connection) {
+                                                        Ok(_deleted) => ("Deleted", StatusCode::Ok),
+                                                        Err(_) => ("Message not found", StatusCode::NotFound)
+                                                    }
+                                                },
+                                                false => ("A reservation_id is required", StatusCode::BadRequest),
+                                            }
                                 },
-                                false => ("A reservation_id is required", StatusCode::BadRequest)
+                                Err(_) => ("Failed to decode JSON.", StatusCode::BadRequest)       
                             }
                         },
-                        Err(_) => {
-                            ("Failed to decode JSON.", StatusCode::BadRequest)
-                        }
+                        Err(_) => ("Message not found", StatusCode::NotFound),
                     };
 
                     let body = json!({
