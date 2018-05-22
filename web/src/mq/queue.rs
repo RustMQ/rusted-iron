@@ -113,7 +113,17 @@ pub fn get_queue_info(queue_name: String, con: &Connection) -> Result<QueueInfo,
         None => String::new()
     };
 
-    let queue_info: QueueInfo = serde_json::from_str(&queue_info_as_str).unwrap();
+    let mut queue_info: QueueInfo = serde_json::from_str(&queue_info_as_str)?;
+    
+    match queue.size {
+        Some(size) => queue_info.size(size),
+        None => bail!("Queue size is none"),
+    };
+
+    match queue.total_messages {
+        Some(total_messages) => queue_info.total_messages(total_messages),
+        None => bail!("Queue total messages is none"),
+    };
 
     return Ok(queue_info);
 }

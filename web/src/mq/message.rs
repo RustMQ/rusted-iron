@@ -346,13 +346,14 @@ pub fn clear_messages(queue_name: &String, con: &Connection) -> Result<bool, Err
     match_queue_key.push_str(&queue_key.clone());
     match_queue_key.push_str(":msg*");
 
-    let iter : Iter<String> = cmd("SCAN").cursor_arg(0).arg("MATCH").arg(match_queue_key).iter(con).unwrap();
+    let iter : Iter<String> = cmd("SCAN").cursor_arg(0).arg("MATCH").arg(match_queue_key).iter(con)?;
     for key in iter {
         info!("DK: {:?}", key);
         if queue_msg_counter_key == key {
             continue;
         }
-        let _: () = cmd("DEL").arg(key).query(con).unwrap();
+        let _: () = cmd("DEL").arg(key).query(con)?;
+        let _: () = con.hincr(&queue_key, "size", -1)?;
     }
 
     let _ : () = con.del(queue_unreserved_key)?;
