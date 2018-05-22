@@ -454,10 +454,60 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                 };
 
                 let mut subscribers: Vec<QueueSubscriber> = {
-                    let body_content: Value = serde_json::from_slice(&valid_body.to_vec()).unwrap();
-                    serde_json::from_value(body_content["subscribers"].clone()).unwrap()
+                    let body_content: Value = match serde_json::from_slice(&valid_body.to_vec()) {
+                        Ok(body_content) => body_content,
+                        Err(_) => {
+                            let body = json!({
+                                "msg": "Failed to decode JSON."
+                            });
+                            let res = create_response(
+                                &state,
+                                StatusCode::BadRequest,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                )),
+                            );
+
+                            return future::ok((state, res));
+                        }
+                    };
+
+                    match serde_json::from_value(body_content["subscribers"].clone()) {
+                        Ok(subscribers) => subscribers,
+                        Err(_) => {
+                            let body = json!({
+                                "msg": "Failed to decode JSON."
+                            });
+                            let res = create_response(
+                                &state,
+                                StatusCode::BadRequest,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                )),
+                            );
+
+                            return future::ok((state, res));
+                        }
+                    }
                 };
 
+                if subscribers.is_empty() {
+                    let body = json!({
+                        "msg": "Push queues must have at least one subscriber"
+                    });
+                    let res = create_response(
+                        &state,
+                        StatusCode::BadRequest,
+                        Some((
+                            body.to_string().into_bytes(),
+                            mime::APPLICATION_JSON
+                        )),
+                    );
+
+                    return future::ok((state, res));
+                };
 
                 let body = match ::mq::queue::replace_subscribers(name, subscribers, &connection) {
                     Ok(updated) => {
@@ -470,7 +520,7 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                                 "msg": String::from("Not Updated")
                             })
                         }
-                    },
+                    }
                     Err(_e) => {
                         let res = create_response(&state, StatusCode::NotFound, None);
                         return future::ok((state, res));
@@ -487,8 +537,8 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                 );
 
                 return future::ok((state, res));
-            },
-            Err(e) => future::err((state, e.into_handler_error()))
+            }
+            Err(e) => future::err((state, e.into_handler_error())),
         });
 
     Box::new(f)
