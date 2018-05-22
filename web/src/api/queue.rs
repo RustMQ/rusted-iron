@@ -461,18 +461,18 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                                 "msg": "Failed to decode JSON."
                             });
                             let res = create_response(
-                            &state,
-                            StatusCode::BadRequest,
-                            Some((
-                                body.to_string().into_bytes(),
-                                mime::APPLICATION_JSON
+                                &state,
+                                StatusCode::BadRequest,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
                                 )),
                             );
 
                             return future::ok((state, res));
                         }
                     };
-                    
+
                     match serde_json::from_value(body_content["subscribers"].clone()) {
                         Ok(subscribers) => subscribers,
                         Err(_) => {
@@ -480,15 +480,15 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                                 "msg": "Failed to decode JSON."
                             });
                             let res = create_response(
-                            &state,
-                            StatusCode::BadRequest,
-                            Some((
-                                body.to_string().into_bytes(),
-                                mime::APPLICATION_JSON
-                            )),
-                        );
+                                &state,
+                                StatusCode::BadRequest,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                )),
+                            );
 
-                        return future::ok((state, res));
+                            return future::ok((state, res));
                         }
                     }
                 };
@@ -520,7 +520,7 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                                 "msg": String::from("Not Updated")
                             })
                         }
-                    },
+                    }
                     Err(_e) => {
                         let res = create_response(&state, StatusCode::NotFound, None);
                         return future::ok((state, res));
@@ -537,8 +537,8 @@ pub fn replace_subscribers(mut state: State) -> Box<HandlerFuture> {
                 );
 
                 return future::ok((state, res));
-            },
-            Err(e) => future::err((state, e.into_handler_error()))
+            }
+            Err(e) => future::err((state, e.into_handler_error())),
         });
 
     Box::new(f)
