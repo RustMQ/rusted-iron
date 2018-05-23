@@ -134,6 +134,18 @@ impl QueueInfo {
         self
     }
 
+    pub fn size(&mut self, size: usize) -> &mut QueueInfo {
+        self.size = Some(size);
+
+        self
+    }
+
+    pub fn total_messages(&mut self, total_messages: usize) -> &mut QueueInfo {
+        self.total_messages = Some(total_messages);
+
+        self
+    }
+
     pub fn is_pull(&mut self) -> Option<bool> {
         match &self.queue_type {
             Some(queue_type) => Some(queue_type == &QueueType::Pull),
