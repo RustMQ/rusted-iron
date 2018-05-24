@@ -1,13 +1,13 @@
-# Rusted Iron
+# Rusted IronMQ
 
-Iron MQ build with Rust
+IronMQ build with Rust
 
 ## Prerequisites
 
 ## Heroku
 
 ### Deployment
-Application have two separeted services: `rusted-iron/web` and `rusted-iron/pusher`.
+Application have two separated services: `rusted-iron/web` and `rusted-iron/pusher`.
 First of all you have to build both of them:
 ```
 $ docker build -f <docker_file> -t rusted-iron/web:v<package_version> .                 # example: docker build -f Dockerfile.web -t rusted-iron/web:v0.0.1 .
