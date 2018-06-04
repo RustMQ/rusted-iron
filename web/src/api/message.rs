@@ -172,7 +172,10 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
                     let queue = queue_name.clone();
                     let mut invalid_messages = messages.clone().into_iter().filter(|req_message| {
                         let message = ::mq::message::get_message(&queue, &req_message.id, &connection);
-                        !req_message.is_valid_for(&message.unwrap())
+                        match &message {
+                            Ok(m) => !req_message.is_valid_for(m),
+                            Err(_) => false
+                        }
                     });
 
                     match invalid_messages.next() {
