@@ -17,7 +17,6 @@ extern crate serde_redis;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
-extern crate rayon;
 extern crate scheduled_thread_pool;
 extern crate bcrypt;
 extern crate queue;
