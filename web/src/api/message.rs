@@ -167,12 +167,31 @@ pub fn delete_messages(mut state: State) -> Box<HandlerFuture> {
                         };
                     }
 
-                    let messages: Vec<MessageDeleteBodyRequest> = serde_json::from_value(body_content["ids"].clone()).unwrap();
+                    let messages: Vec<MessageDeleteBodyRequest> = match serde_json::from_value(body_content["ids"].clone()) {
+                        Ok(messages) => messages,
+                        Err(_) => {
+                            let body = json!({
+                              "msg": "Failed to decode JSON."
+                            });
+                            let res = create_response(
+                                &state,
+                                StatusCode::BadRequest,
+                                Some((
+                                    body.to_string().into_bytes(),
+                                    mime::APPLICATION_JSON
+                                ))
+                            );
+                            return future::ok((state, res));
+                        }
+                    };
                     
                     let queue = queue_name.clone();
                     let mut invalid_messages = messages.clone().into_iter().filter(|req_message| {
                         let message = ::mq::message::get_message(&queue, &req_message.id, &connection);
-                        !req_message.is_valid_for(&message.unwrap())
+                        match &message {
+                            Ok(m) => !req_message.is_valid_for(m),
+                            Err(_) => false
+                        }
                     });
 
                     match invalid_messages.next() {

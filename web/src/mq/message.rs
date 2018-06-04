@@ -127,12 +127,15 @@ pub fn delete_message(queue_name: &String, message: &Message, con: &Connection) 
     msg_key.push_str(":msg:");
     msg_key.push_str(&message.id.clone().unwrap());
 
-    let deleted: isize = pipe()
+    let deleted: Value = pipe()
         .zrem(&queue_reserved_key, &[&msg_key]).ignore()
         .zrem(&queue_unreserved_key, &[&msg_key]).ignore()
         .del(&msg_key)
         .query(con)?;
-    if deleted == 1 {
+
+    let mut status: Vec<u8> = from_redis_value(&deleted).unwrap();
+
+    if status.pop() == Some(1) {
         con.hincr(&queue_key, "size", -1)?;
     }
 
@@ -226,8 +229,12 @@ pub fn delete_messages(queue_name: String, messages: &Vec<MessageDeleteBodyReque
     Ok(messages
         .into_iter()
         .map(|message| {
-            let deleted = delete(queue_name.to_string(), message.id.to_owned(), con).unwrap();
-            deleted
+            match delete(queue_name.to_string(), message.id.to_owned(), con) {
+                Ok(deleted) => deleted,
+                Err(_) => {
+                    false
+                }
+            }
         })
         .collect())
 }
