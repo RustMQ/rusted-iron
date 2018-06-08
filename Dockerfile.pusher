@@ -14,7 +14,7 @@ ADD ./pusher/src src
 
 RUN cargo build --release
 
-FROM rust:1.26
+FROM rust:1.26-slim
 RUN useradd -m iron
 USER iron
 
