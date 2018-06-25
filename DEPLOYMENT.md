@@ -10,9 +10,9 @@ Let's assume that you Docker images already prepared under names: `rustmq/web` a
 
 To push an image to Heroku, such as one pulled from Docker Hub, tag it and push it according to this naming template:
 
-```
-$ docker tag rustmq/web:v<package_version> registry.heroku.com/<app>/<process-type>     # example: docker tag rustmq/web:v0.0.1 registry.heroku.com/rusted-iron/web
-$ docker push registry.heroku.com/<app>/<process-type>                                  # example: docker push registry.heroku.com/rusted-iron/web
+```bash
+docker tag rustmq/web:v<package_version> registry.heroku.com/<app>/<process-type>     # example: docker tag rustmq/web:v0.0.1 registry.heroku.com/rusted-iron/web
+docker push registry.heroku.com/<app>/<process-type>                                  # example: docker push registry.heroku.com/rusted-iron/web
 ```
 
 **Note:** Last command will initiate a deployment on your heroku instance.

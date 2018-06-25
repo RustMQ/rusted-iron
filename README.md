@@ -4,7 +4,7 @@ Iron MQ build with Rust
 
 ## Prerequisites
 
-Current application used **stable** [Rust](https://www.rust-lang.org/en-US/). At this moment we use latest stable version of Rust **1.26.2**.
+Current application used **stable** [Rust](https://www.rust-lang.org/en-US/). At this moment we use latest stable version of Rust **1.27.0**.
 Also, as DB we used [Redis](https://redis.io). At this moment we use latest stable version of Rust **4.0.9**.
 
 ## Project layout
