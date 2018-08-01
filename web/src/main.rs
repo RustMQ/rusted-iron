@@ -23,6 +23,7 @@ extern crate queue;
 extern crate chrono;
 #[macro_use]
 extern crate failure;
+extern crate gotham_cors_middleware;
 
 mod middleware;
 mod pool;
@@ -58,6 +59,8 @@ use api::{
     }
 };
 
+use gotham_cors_middleware::CORSMiddleware;
+
 fn router(pool: Pool) -> Router {
     let redis_middleware = RedisMiddleware::with_pool(pool);
     let pipelines = new_pipeline_set();
@@ -69,6 +72,7 @@ fn router(pool: Pool) -> Router {
 
     let (pipelines, extended) = pipelines.add(
         new_pipeline()
+            .add(CORSMiddleware)
             .add(redis_middleware.clone())
             // Disabled Auth
             // .add(AuthMiddleware)
@@ -91,10 +95,16 @@ fn router(pool: Pool) -> Router {
 
         route.with_pipeline_chain(extended_chain, |route| {
             route.scope("/3/projects/:project_id", |route| {
+                route.options("/queues")
+                    .with_path_extractor::<QueuePathExtractor>()
+                    .to(api::queue::options);
                 route.get("/queues")
                     .with_path_extractor::<QueuePathExtractor>()
                     .to(api::queue::list_queues);
                 route.scope("/queues/:name", |route| {
+                    route.options("")
+                        .with_path_extractor::<QueuePathExtractor>()
+                        .to(api::queue::options);
                     route.put("")
                         .with_path_extractor::<QueuePathExtractor>()
                         .to(api::queue::put_queue);

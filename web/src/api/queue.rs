@@ -210,6 +210,24 @@ pub fn reserve_messages(mut state: State) -> Box<HandlerFuture> {
 
     Box::new(f)
 }
+pub fn options(mut state: State) -> Box<HandlerFuture> {
+        let f = Body::take_from(&mut state)
+            .concat2()
+            .then(|full_body| match full_body {
+                Ok(_valid_body) => {
+                    let res = create_response(
+                                &state,
+                                StatusCode::Ok,
+                                None
+                            );
+
+                            return future::ok((state, res));
+                },
+                Err(e) => future::err((state, e.into_handler_error()))
+            });
+
+        Box::new(f)
+}
 
 pub fn list_queues(mut state: State) -> Box<HandlerFuture> {
         let f = Body::take_from(&mut state)
