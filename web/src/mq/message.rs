@@ -274,9 +274,18 @@ pub fn peek_messages(queue_name: &String, number_to_peek: &i32, con: &Connection
     queue_unreserved_key.push_str(&queue_key.clone());
     queue_unreserved_key.push_str(":unreserved:msg");
 
+    let mut queue_reserved_key = String::new();
+    queue_reserved_key.push_str(&queue_key.clone());
+    queue_reserved_key.push_str(":reserved:msg");
+
     let unreserved_msg_key_list: Vec<(String, isize)> = con.zrangebyscore_limit_withscores(&queue_unreserved_key, "0", "+inf", 0, *number_to_peek as isize).unwrap();
+    let reserved_msg_key_list: Vec<(String, isize)> = con.zrangebyscore_limit_withscores(&queue_reserved_key, "0", "+inf", 0, *number_to_peek as isize).unwrap();
     let mut message_key_list = Vec::new();
     for msg_key in unreserved_msg_key_list {
+        message_key_list.push(msg_key.0.clone());
+    };
+
+    for msg_key in reserved_msg_key_list {
         message_key_list.push(msg_key.0.clone());
     };
 

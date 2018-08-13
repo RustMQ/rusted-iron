@@ -9,8 +9,7 @@ pub struct Message {
     #[serde(skip_serializing_if = "Option::is_none")] pub reserved_count: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")] pub reservation_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")] pub source_msg_id: Option<String>,
-    #[serde(skip_serializing)]
-    pub state: Option<MessageState>
+    #[serde(skip_serializing_if = "Option::is_none")] pub state: Option<MessageState>
 }
 
 impl Message {
