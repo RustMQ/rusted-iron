@@ -91,7 +91,7 @@ pub fn delete(queue_name: String, con: &Connection) -> Result<bool, Error> {
     let mut match_queue_key = String::new();
     match_queue_key.push_str("queue:");
     match_queue_key.push_str(&queue_name);
-    match_queue_key.push_str("*");
+    match_queue_key.push_str(":*");
 
     let iter : Iter<String> = cmd("SCAN").cursor_arg(0).arg("MATCH").arg(match_queue_key).iter(con)?;
     let mut deleted = false;
