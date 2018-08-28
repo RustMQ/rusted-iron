@@ -169,6 +169,6 @@ pub fn main() {
     let port: String = env::var("PORT").expect("$PORT is provided");
 
     let addr = format!("0.0.0.0:{}", port);
-    info!("Rusted-Iron web started on: {}", addr);
+    info!("RustMQ web started on: {}", addr);
     gotham::start(addr, router(pool))
 }
