@@ -1,4 +1,4 @@
-FROM rust:1.27 as build
+FROM rust:1.28 as build
 
 WORKDIR /usr/src/queue
 
@@ -14,7 +14,7 @@ ADD ./web/src src
 
 RUN cargo build --release
 
-FROM rust:1.27-slim
+FROM rust:1.28-slim
 RUN useradd -m iron
 USER iron
 
