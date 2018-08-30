@@ -148,7 +148,8 @@ fn main() -> Result<(), Error> {
 
     info!("pusher starting up");
     let client = prepare_client();
-    let mut pubsub = client.get_pubsub()?;
+    let mut connection = client.get_connection()?;
+    let mut pubsub = connection.as_pubsub();
     let () = pubsub.psubscribe("queue:*:msg:channel")?;
 
     loop {
