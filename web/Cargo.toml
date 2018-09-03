@@ -5,8 +5,8 @@ authors = ["Maksym Shekhovets <maximsh@interlink-ua.com>"]
 publish = false
 
 [dependencies]
-gotham = "0.2.0"
-gotham_derive = "0.2.0"
+gotham = "0.2.1"
+gotham_derive = "0.2.1"
 redis = "0.9.0"
 r2d2 = "0.8"
 r2d2_redis = { git = "https://github.com/RustMQ/r2d2-redis", branch = "update-connection-validation" }
