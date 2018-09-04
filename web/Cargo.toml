@@ -16,7 +16,7 @@ objectid = { version = "^0.2", features = ["serde"] }
 hyper = "0.11"
 futures = "0.1"
 tokio = "0.1"
-log = "0.4.1"
+log = "0.4"
 env_logger = "0.5"
 mime = "0.3.5"
 num_cpus = "1.0"
