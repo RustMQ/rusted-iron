@@ -1,4 +1,5 @@
 extern crate mime;
+extern crate serde_json;
 
 pub mod redis;
 pub mod queue;
@@ -6,27 +7,35 @@ pub mod message;
 
 use hyper::{Response, StatusCode};
 use gotham::{
+    handler::IntoResponse,
     http::response::create_response,
     state::{
         State
     }
 };
 
-pub fn index(state: State) -> (State, Response) {
-    let res = {
-        let res_str = r#"{
-            "goto": "http://www.iron.io"
-        }"#;
+#[derive(Serialize)]
+pub struct Index {
+    goto: String,
+}
 
+impl IntoResponse for Index {
+    fn into_response(self, state: &State) -> Response {
         create_response(
-            &state,
+            state,
             StatusCode::Ok,
             Some((
-                res_str.to_string().into_bytes(),
+                serde_json::to_string(&self).expect("serialized index").into_bytes(),
                 mime::APPLICATION_JSON
-            )),
+            ))
         )
+    }
+}
+
+pub fn index(state: State) -> (State, Index) {
+    let index = Index {
+        goto: "http://www.iron.io".to_string(),
     };
 
-    (state, res)
+    (state, index)
 }
