@@ -2,7 +2,6 @@ extern crate futures;
 extern crate gotham;
 
 extern crate redis;
-extern crate r2d2;
 extern crate r2d2_redis;
 
 use std::{
@@ -27,7 +26,7 @@ use gotham::{
         State
     }
 };
-use r2d2_redis::RedisConnectionManager;
+use r2d2_redis::{r2d2, RedisConnectionManager};
 
 #[derive(StateData)]
 pub struct RedisPool {
