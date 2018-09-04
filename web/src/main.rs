@@ -5,7 +5,6 @@ extern crate gotham_derive;
 extern crate hyper;
 extern crate mime;
 extern crate redis;
-extern crate r2d2;
 extern crate r2d2_redis;
 extern crate serde;
 #[macro_use]

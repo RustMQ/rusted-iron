@@ -3,8 +3,7 @@ extern crate num_cpus;
 use std::env;
 use scheduled_thread_pool::ScheduledThreadPool;
 use std::sync::Arc;
-use r2d2;
-use r2d2_redis::RedisConnectionManager;
+use r2d2_redis::{r2d2, RedisConnectionManager};
 
 pub type Pool = r2d2::Pool<RedisConnectionManager>;
 
